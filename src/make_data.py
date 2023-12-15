@@ -45,10 +45,8 @@ def make_graph(args):
                     set(nx.greedy_color(G, "connected_sequential_bfs").values())
                 )
                 data_path = os.path.join(args.folder_path, str(idx).zfill(8) + ".csv")
-                pd.DataFrame(G.edges, columns=("n1", "n2")).to_csv(
-                    data_path, index=False
-                )
-
+                graph = pd.DataFrame(G.edges, columns=("n1", "n2")) + 1
+                graph.to_csv(data_path, index=False)
                 df["data_path"].append(data_path)
                 df["colors"].append(colors)
                 df["node_number"].append(len(G.nodes))
