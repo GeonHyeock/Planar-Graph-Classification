@@ -73,7 +73,7 @@ class GCnet(nn.Module):
 
     def forward(self, x):
         adj, x = self.embedding(x, self.device)
-        x = self.Tnet(adj, x)
+        x = self.convblocks(adj, x)
         return self.log_soft(self.last_layer(x))
 
 
