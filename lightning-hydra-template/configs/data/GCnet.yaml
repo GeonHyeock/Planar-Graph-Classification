@@ -1,0 +1,6 @@
+_target_: src.data.GCnet_datamodule.GCnetDataModule
+data_dir: ${paths.data_dir}
+batch_size: 128 
+num_workers: 0
+pin_memory: False
+data_version: version_001
