@@ -10,6 +10,7 @@ class GCnetDataModule(LightningDataModule):
         self,
         data_dir="data/",
         batch_size=64,
+        test_batch_size=1,
         num_workers=0,
         pin_memory=False,
         data_version="",
@@ -22,6 +23,7 @@ class GCnetDataModule(LightningDataModule):
         self.data_val = GraphDataset(version_path, "valid")
         self.data_test = GraphDataset(version_path, "test")
         self.batch_size_per_device = batch_size
+        self.test_batch_size = test_batch_size
 
     def setup(self, stage: Optional[str] = None) -> None:
         # Divide batch size by the number of devices.
@@ -70,7 +72,7 @@ class GCnetDataModule(LightningDataModule):
         """
         return DataLoader(
             dataset=self.data_test,
-            batch_size=self.batch_size_per_device,
+            batch_size=self.test_batch_size,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
             shuffle=False,

@@ -91,7 +91,8 @@ class GCnetLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch)
 
         self.test_result["data_path"] += batch["data_path"]
-        self.test_result["preds"] += preds.tolist()
+        self.test_result["predict"] += preds.tolist()
+        self.test_result["loss"] += [loss.tolist()]
 
         # update and log metrics
         self.test_loss(loss)
