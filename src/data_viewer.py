@@ -15,8 +15,8 @@ def my_tab1(data_type, df, idx):
     with col2:
         st.dataframe(df.iloc[idx].astype(str), width=int(1e3))
         if data_type == "test":
-            PF = df.iloc[idx]["colors"] == (df.iloc[idx]["predict"] + 1)
-            if PF == True:
+            color = 1 if df.iloc[idx]["colors"] == 2 else 0
+            if df.iloc[idx]["predict"] == color:
                 st.write("예측 성공")
             else:
                 st.write("예측 실패")
@@ -31,7 +31,7 @@ def pred_df(data_path, df):
     predict_df = pd.merge(df, predict_df, how="inner").sort_values(
         "loss", ascending=False
     )
-    return predict_df
+    return predict_df.reset_index(drop=True)
 
 
 def graph_visual(data):
@@ -59,7 +59,7 @@ def slidebar():
             df = df[df["type"] == data_type]
 
         idx = st.slider("data를 선택해주세요.", 0, len(df) - 1, 0, 1)
-        return df, idx, data_path, data_type
+        return df.reset_index(drop=True), idx, data_path, data_type
 
 
 def main():
