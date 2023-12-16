@@ -1,9 +1,13 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import torch
+import pandas as pd
+import os
+from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.classification.accuracy import Accuracy
+from collections import defaultdict
 
 
 class GCnetLitModule(LightningModule):
@@ -13,9 +17,10 @@ class GCnetLitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
+        DataVersion: str,
     ) -> None:
         super().__init__()
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(logger=True)
 
         self.net = net
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -29,6 +34,8 @@ class GCnetLitModule(LightningModule):
         self.test_loss = MeanMetric()
 
         self.val_acc_best = MaxMetric()
+
+        self.test_result = defaultdict(list)
 
     def forward(self, x):
         return self.net(x)
@@ -52,10 +59,10 @@ class GCnetLitModule(LightningModule):
         self.train_loss(loss)
         self.train_acc(preds, targets)
         self.log(
-            "train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True
+            "train/loss", self.train_loss, on_step=True, on_epoch=False, prog_bar=True
         )
         self.log(
-            "train/acc", self.train_acc, on_step=False, on_epoch=True, prog_bar=True
+            "train/acc", self.train_acc, on_step=True, on_epoch=False, prog_bar=True
         )
 
         return loss
@@ -83,6 +90,9 @@ class GCnetLitModule(LightningModule):
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
 
+        self.test_result["data_path"] += batch["data_path"]
+        self.test_result["preds"] += preds.tolist()
+
         # update and log metrics
         self.test_loss(loss)
         self.test_acc(preds, targets)
@@ -92,7 +102,15 @@ class GCnetLitModule(LightningModule):
         self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
-        pass
+        result_df = pd.DataFrame(self.test_result)
+        if isinstance(self.logger, WandbLogger):
+            create_folder(f"../data/result/{self.hparams.DataVersion}")
+            result_df.to_csv(
+                f"../data/result/{self.hparams.DataVersion}/{self.logger._name}.csv",
+                index=False,
+            )
+        else:
+            result_df.to_csv(f"../data/result/my_result.csv", index=False)
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
@@ -112,6 +130,11 @@ class GCnetLitModule(LightningModule):
                 },
             }
         return {"optimizer": optimizer}
+
+
+def create_folder(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
 
 
 if __name__ == "__main__":

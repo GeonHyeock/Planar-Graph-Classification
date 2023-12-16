@@ -67,7 +67,9 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)
+    trainer: Trainer = hydra.utils.instantiate(
+        cfg.trainer, callbacks=callbacks, logger=logger
+    )
 
     object_dict = {
         "cfg": cfg,
@@ -117,6 +119,9 @@ def main(cfg: DictConfig) -> Optional[float]:
     extras(cfg)
 
     # train the model
+    if "wandb" in cfg.get("logger"):
+        cfg.get("logger").wandb["group"] = cfg.get("data").data_version
+        cfg.get("model").DataVersion = cfg.get("data").data_version
     metric_dict, _ = train(cfg)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
