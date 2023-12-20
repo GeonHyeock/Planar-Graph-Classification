@@ -5,9 +5,9 @@ import pandas as pd
 import os
 from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning import LightningModule
-from torchmetrics import MeanMetric
-from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
-from torchmetrics import MetricCollection
+from torchmetrics import MeanMetric, MetricCollection
+from torchmetrics.classification import MulticlassAccuracy, Precision, Recall, F1Score
+from torchmetrics.wrappers import ClasswiseWrapper
 from collections import defaultdict
 
 
@@ -30,8 +30,11 @@ class GCnetLitModule(LightningModule):
         self.train_metric, self.valid_metric, self.test_metric = [
             MetricCollection(
                 {
-                    f"{name}/Accuracy": Accuracy(
-                        task="multiclass", num_classes=net.classes, average="micro"
+                    f"{name}/Accuracy": ClasswiseWrapper(
+                        MulticlassAccuracy(num_classes=net.classes, average=None),
+                        labels=[str(i) for i in range(2, net.classes + 2)],
+                        prefix=f"{name}/Accuracy/",
+                        postfix="-Color",
                     ),
                     f"{name}/Precision": Precision(
                         task="multiclass", num_classes=net.classes, average="macro"
@@ -70,8 +73,6 @@ class GCnetLitModule(LightningModule):
 
         self.train_loss(loss)
         self.train_metric(preds, targets)
-
-        self.log_dict(self.train_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
             "train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True
         )
@@ -79,7 +80,9 @@ class GCnetLitModule(LightningModule):
         return loss
 
     def on_train_epoch_end(self):
-        pass
+        metric = self.train_metric.compute()
+        self.log_dict(metric)
+        self.train_metric.reset()
 
     def validation_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
@@ -88,13 +91,14 @@ class GCnetLitModule(LightningModule):
         self.valid_loss(loss)
         self.valid_metric(preds, targets)
 
-        self.log_dict(self.valid_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
             "valid/loss", self.valid_loss, on_step=False, on_epoch=True, prog_bar=True
         )
 
     def on_validation_epoch_end(self) -> None:
-        pass
+        metric = self.valid_metric.compute()
+        self.log_dict(metric)
+        self.valid_metric.reset()
 
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
@@ -106,13 +110,15 @@ class GCnetLitModule(LightningModule):
         # update and log metrics
         self.test_loss(loss)
         self.test_metric(preds, targets)
-
-        self.log_dict(self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
             "test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True
         )
 
-    def on_test_epoch_end(self) -> None:
+    def on_test_epoch_end(self):
+        metric = self.test_metric.compute()
+        self.log_dict(metric)
+        self.test_metric.reset()
+
         result_df = pd.DataFrame(self.test_result)
         if isinstance(self.logger, WandbLogger):
             create_folder(f"../data/result/{self.hparams.DataVersion}")
