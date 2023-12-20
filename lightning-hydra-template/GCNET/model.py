@@ -12,10 +12,10 @@ class EmbeddingLayer(nn.Module):
         self.embed = nn.Embedding(node_number, embedding_size, padding_idx=0)
         nn.init.xavier_uniform_(self.embed.weight[1:])
 
-    def forward(self, x, device):
+    def forward(self, x):
         degree = torch.sum(x, dim=1)
         embed = self.embed(degree.type(torch.long)).permute(0, 2, 1)
-        adj = x + torch.eye(*x.size()[1:]).to(device)
+        adj = x
         return adj, embed
 
 
@@ -95,10 +95,9 @@ class GCnet(nn.Module):
         self.last_layer = LastLayer(embedding_size, last_layer, classes)
         self.log_soft = nn.LogSoftmax(dim=1)
         self.classes = classes
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def forward(self, x):
-        adj, x = self.embedding(x, self.device)
+        adj, x = self.embedding(x)
         x = self.convblocks(adj, x)
         return self.log_soft(self.last_layer(x))
 
