@@ -15,8 +15,7 @@ def my_tab1(data_type, df, idx, cmaps):
     with col2:
         st.dataframe(df.iloc[idx].astype(str), width=int(1e3))
         if data_type == "test":
-            color = 1 if df.iloc[idx]["colors"] == 2 else 0
-            if df.iloc[idx]["predict"] == color:
+            if df.iloc[idx]["predict"] + 2 == df.iloc[idx]["colors"]:
                 st.write("예측 성공")
             else:
                 st.write("예측 실패")
