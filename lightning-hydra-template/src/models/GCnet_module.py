@@ -7,6 +7,7 @@ from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning import LightningModule
 from torchmetrics import MeanMetric
 from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
+from torchmetrics import MetricCollection
 from collections import defaultdict
 
 
@@ -26,30 +27,25 @@ class GCnetLitModule(LightningModule):
         self.net = net
         self.criterion = torch.nn.CrossEntropyLoss()
 
-        train_metric = {
-            "train/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
-            "train/Precision": Precision(task="multiclass", num_classes=net.classes),
-            "train/Recall": Recall(task="multiclass", num_classes=net.classes),
-            "train/F1Score": F1Score(task="multiclass", num_classes=net.classes),
-        }
-
-        valid_metric = {
-            "valid/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
-            "valid/Precision": Precision(task="multiclass", num_classes=net.classes),
-            "valid/Recall": Recall(task="multiclass", num_classes=net.classes),
-            "valid/F1Score": F1Score(task="multiclass", num_classes=net.classes),
-        }
-
-        test_metric = {
-            "test/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
-            "test/Precision": Precision(task="multiclass", num_classes=net.classes),
-            "test/Recall": Recall(task="multiclass", num_classes=net.classes),
-            "test/F1Score": F1Score(task="multiclass", num_classes=net.classes),
-        }
-
-        self.train_metric = torch.nn.ModuleDict(train_metric)
-        self.valid_metric = torch.nn.ModuleDict(valid_metric)
-        self.test_metric = torch.nn.ModuleDict(test_metric)
+        self.train_metric, self.valid_metric, self.test_metric = [
+            MetricCollection(
+                {
+                    f"{name}/Accuracy": Accuracy(
+                        task="multiclass", num_classes=net.classes, average="micro"
+                    ),
+                    f"{name}/Precision": Precision(
+                        task="multiclass", num_classes=net.classes, average="macro"
+                    ),
+                    f"{name}/Recall": Recall(
+                        task="multiclass", num_classes=net.classes, average="macro"
+                    ),
+                    f"{name}/F1Score": F1Score(
+                        task="multiclass", num_classes=net.classes, average="macro"
+                    ),
+                }
+            )
+            for name in ["train", "valid", "test"]
+        ]
 
         self.train_loss = MeanMetric()
         self.valid_loss = MeanMetric()
@@ -65,18 +61,15 @@ class GCnetLitModule(LightningModule):
 
     def model_step(self, batch):
         logits = self.forward(batch["graph"])
-        y = batch["colors"] - 1
-        y = torch.where(y == 1, y, 0)
-        loss = self.criterion(logits, y)
+        loss = self.criterion(logits, batch["colors"])
         preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        return loss, preds, batch["colors"]
 
     def training_step(self, batch):
         loss, preds, targets = self.model_step(batch)
 
-        for name, metric in self.train_metric.items():
-            metric.update(preds, targets)
         self.train_loss(loss)
+        self.train_metric(preds, targets)
 
         self.log_dict(self.train_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
@@ -92,9 +85,8 @@ class GCnetLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
-        for name, metric in self.valid_metric.items():
-            metric.update(preds, targets)
         self.valid_loss(loss)
+        self.valid_metric(preds, targets)
 
         self.log_dict(self.valid_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
@@ -112,9 +104,8 @@ class GCnetLitModule(LightningModule):
         self.test_result["loss"] += [loss.tolist()]
 
         # update and log metrics
-        for name, metric in self.test_metric.items():
-            metric.update(preds, targets)
         self.test_loss(loss)
+        self.test_metric(preds, targets)
 
         self.log_dict(self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
