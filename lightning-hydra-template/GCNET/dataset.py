@@ -12,6 +12,9 @@ class GraphDataset(Dataset):
         self.data = pd.read_csv(os.path.join(data_version, "label.csv"))
         self.data = self.data[self.data.type == data_type].reset_index(drop=True)
 
+        graph_dict = pd.read_csv(os.path.join(data_version, "graph_dict.csv"))
+        self.graph_dict = {c: l for c, l in zip(graph_dict.color, graph_dict.label)}
+
     def __len__(self):
         return len(self.data)
 
@@ -20,6 +23,7 @@ class GraphDataset(Dataset):
         G = pd.read_csv(os.path.join(self.data_folder, d["data_path"])).values
         G = nx.to_numpy_array(nx.from_edgelist(G))
         d.update({"graph": G})
+        d["colors"] = self.graph_dict[d["colors"]]
         return d
 
 

@@ -119,7 +119,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     extras(cfg)
 
     # train the model
-    if "wandb" in cfg.get("logger"):
+    if "logger" in cfg.keys() and "wandb" in cfg.get("logger"):
         cfg.get("logger").wandb["group"] = cfg.get("data").data_version
         cfg.get("model").DataVersion = cfg.get("data").data_version
     metric_dict, _ = train(cfg)
