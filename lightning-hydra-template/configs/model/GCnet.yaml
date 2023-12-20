@@ -21,9 +21,10 @@ scheduler_frequency: 1
 net:
   _target_: GCNET.model.GCnet
   node_number: 50
-  embedding_size: 256
+  embedding_size: 512
   block_layer: 3
-  classes: 8
+  last_layer: 3
+  classes: 9
 
 # compile model for faster training with pytorch 2.0
 compile: false
