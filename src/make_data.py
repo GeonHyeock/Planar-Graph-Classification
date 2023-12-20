@@ -64,7 +64,7 @@ def make_graph(args):
     with tqdm(total=args.N * (args.k - 1)) as pbar:
         for k in range(2, args.k + 1):
             for _ in range(args.N):
-                n = random.randint(5, args.node)
+                n = random.randint(k, args.node)
                 G, nodes = k_color_graph(n, k)
 
                 # pd.DataFrame(,columns=["color_idx","node"])
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument("--version", default=2, help="data_version")
     parser.add_argument("--node", default=50, help="그래프 노드의 개수")
     parser.add_argument("--k", default=10, help="생성할 그래프의 최대 채색수")
-    parser.add_argument("--N", default=20, help="채색수 별 생성할 그래프")
+    parser.add_argument("--N", default=1000, help="채색수 별 생성할 그래프")
     args = parser.parse_args()
     args.folder_path = "./data/version_" + str(args.version).zfill(3)
 
