@@ -5,8 +5,8 @@ import pandas as pd
 import os
 from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric
-from torchmetrics.classification.accuracy import Accuracy
+from torchmetrics import MeanMetric
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
 from collections import defaultdict
 
 
@@ -18,6 +18,7 @@ class GCnetLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
         DataVersion: str,
+        **kwargs,
     ) -> None:
         super().__init__()
         self.save_hyperparameters(logger=True)
@@ -25,15 +26,34 @@ class GCnetLitModule(LightningModule):
         self.net = net
         self.criterion = torch.nn.CrossEntropyLoss()
 
-        self.train_acc = Accuracy(task="multiclass", num_classes=10)
-        self.val_acc = Accuracy(task="multiclass", num_classes=10)
-        self.test_acc = Accuracy(task="multiclass", num_classes=10)
+        train_metric = {
+            "train/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
+            "train/Precision": Precision(task="multiclass", num_classes=net.classes),
+            "train/Recall": Recall(task="multiclass", num_classes=net.classes),
+            "train/F1Score": F1Score(task="multiclass", num_classes=net.classes),
+        }
+
+        valid_metric = {
+            "valid/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
+            "valid/Precision": Precision(task="multiclass", num_classes=net.classes),
+            "valid/Recall": Recall(task="multiclass", num_classes=net.classes),
+            "valid/F1Score": F1Score(task="multiclass", num_classes=net.classes),
+        }
+
+        test_metric = {
+            "test/Accuracy": Accuracy(task="multiclass", num_classes=net.classes),
+            "test/Precision": Precision(task="multiclass", num_classes=net.classes),
+            "test/Recall": Recall(task="multiclass", num_classes=net.classes),
+            "test/F1Score": F1Score(task="multiclass", num_classes=net.classes),
+        }
+
+        self.train_metric = torch.nn.ModuleDict(train_metric)
+        self.valid_metric = torch.nn.ModuleDict(valid_metric)
+        self.test_metric = torch.nn.ModuleDict(test_metric)
 
         self.train_loss = MeanMetric()
-        self.val_loss = MeanMetric()
+        self.valid_loss = MeanMetric()
         self.test_loss = MeanMetric()
-
-        self.val_acc_best = MaxMetric()
 
         self.test_result = defaultdict(list)
 
@@ -41,9 +61,7 @@ class GCnetLitModule(LightningModule):
         return self.net(x)
 
     def on_train_start(self):
-        self.val_loss.reset()
-        self.val_acc.reset()
-        self.val_acc_best.reset()
+        pass
 
     def model_step(self, batch):
         logits = self.forward(batch["graph"])
@@ -56,13 +74,13 @@ class GCnetLitModule(LightningModule):
     def training_step(self, batch):
         loss, preds, targets = self.model_step(batch)
 
+        for name, metric in self.train_metric.items():
+            metric.update(preds, targets)
         self.train_loss(loss)
-        self.train_acc(preds, targets)
+
+        self.log_dict(self.train_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
-            "train/loss", self.train_loss, on_step=True, on_epoch=False, prog_bar=True
-        )
-        self.log(
-            "train/acc", self.train_acc, on_step=True, on_epoch=False, prog_bar=True
+            "train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True
         )
 
         return loss
@@ -74,18 +92,17 @@ class GCnetLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
-        self.val_loss(loss)
-        self.val_acc(preds, targets)
-        self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        for name, metric in self.valid_metric.items():
+            metric.update(preds, targets)
+        self.valid_loss(loss)
+
+        self.log_dict(self.valid_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "valid/loss", self.valid_loss, on_step=False, on_epoch=True, prog_bar=True
+        )
 
     def on_validation_epoch_end(self) -> None:
-        acc = self.val_acc.compute()
-        self.val_acc_best(acc)
-
-        self.log(
-            "val/acc_best", self.val_acc_best.compute(), sync_dist=True, prog_bar=True
-        )
+        pass
 
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
@@ -95,12 +112,14 @@ class GCnetLitModule(LightningModule):
         self.test_result["loss"] += [loss.tolist()]
 
         # update and log metrics
+        for name, metric in self.test_metric.items():
+            metric.update(preds, targets)
         self.test_loss(loss)
-        self.test_acc(preds, targets)
+
+        self.log_dict(self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log(
             "test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True
         )
-        self.log("test/acc", self.test_acc, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         result_df = pd.DataFrame(self.test_result)
@@ -125,9 +144,9 @@ class GCnetLitModule(LightningModule):
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "monitor": "val/loss",
-                    "interval": "epoch",
-                    "frequency": 1,
+                    "monitor": self.hparams.scheduler_monitor,
+                    "interval": self.hparams.scheduler_interval,
+                    "frequency": self.hparams.scheduler_frequency,
                 },
             }
         return {"optimizer": optimizer}

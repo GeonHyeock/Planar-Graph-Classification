@@ -69,6 +69,7 @@ class GCnet(nn.Module):
         self.convblocks = BLOCKS(embedding_size, block_layer)
         self.last_layer = nn.Linear(embedding_size, classes)
         self.log_soft = nn.LogSoftmax(dim=1)
+        self.classes = classes
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def forward(self, x):
