@@ -37,7 +37,7 @@ class ConvBlock(nn.Module):
 
         for layer in self.block:
             if isinstance(layer, nn.Conv1d):
-                nn.init.xavier_normal(layer.weight)
+                nn.init.xavier_normal_(layer.weight)
 
     def forward(self, x):
         return self.block(x)
@@ -96,21 +96,63 @@ class GCnet(nn.Module):
         self.log_soft = nn.LogSoftmax(dim=1)
         self.classes = classes
 
-    def forward(self, x):
+    def forward(self, x, latent=False):
         adj, x = self.embedding(x)
         x = self.convblocks(adj, x)
+        if latent:
+            return x
         return self.log_soft(self.last_layer(x))
 
 
 if __name__ == "__main__":
-    data1 = pd.read_csv("/home/user/project/data/version_001/00000000.csv").values
-    data1 = nx.to_numpy_array(nx.from_edgelist(data1))
+    from itertools import permutations
 
-    data2 = pd.read_csv("/home/user/project/data/version_001/00000001.csv").values
-    data2 = nx.to_numpy_array(nx.from_edgelist(data2))
+    def errors(output):
+        errors = []
+        for i in range(len(output)):
+            for j in range(i + 1, len(output)):
+                error = torch.pow(((output[i] - output[j]) ** 2).sum(), 0.5)
+                errors.append(error)
+        errors = torch.stack(errors)
+        return errors.max().cpu(), errors.mean().cpu(), errors.min().cpu()
 
-    data1 = np.pad(data1, ((0, 32), (0, 32)))
+    def invariant_test(G_node):
+        print("Isomorphism_error")
+        batch, n = [], max(sum(G_node, [])) + 1
+        for permu in permutations(range(n), n):
+            data = np.zeros((n, n))
+            for i, j in G_node:
+                data[permu[i], permu[j]] = 1
+                data[permu[j], permu[i]] = 1
+            batch.append(torch.from_numpy(data))
+        batch = torch.stack(batch).type(torch.float32).cuda()
 
-    net = GCnet()
-    x = torch.stack((torch.from_numpy(data1), torch.from_numpy(data2)), dim=0)
-    output = net(x)
+        with torch.no_grad():
+            net = GCnet().cuda()
+            output = net(batch, latent=True)
+            max_error, mean_error, min_error = errors(output)
+            print(
+                f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}"
+            )
+
+    def initial_error(G_node):
+        print("base_error")
+        n = max(sum(G_node, [])) + 1
+        d1 = nx.to_numpy_array(nx.cycle_graph(n))
+        d2 = nx.to_numpy_array(nx.star_graph(n - 1))
+        d3 = nx.to_numpy_array(nx.complete_graph(n))
+        d4 = nx.to_numpy_array(nx.path_graph(n))
+        d5 = nx.to_numpy_array(nx.Graph(G_node))
+        data = torch.tensor(np.stack([d1, d2, d3, d4, d5]), dtype=torch.float32).cuda()
+
+        with torch.no_grad():
+            net = GCnet().cuda()
+            output = net(data, latent=True)
+            max_error, mean_error, min_error = errors(output)
+            print(
+                f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}"
+            )
+
+    G_node = [[0, 1], [0, 2], [0, 3], [1, 2], [2, 3], [3, 4]]
+    invariant_test(G_node)
+    initial_error(G_node)
