@@ -24,7 +24,7 @@ net:
   embedding_size: 512
   block_layer: 5
   last_layer: 3
-  classes: 9
+  classes: 2
 
 # compile model for faster training with pytorch 2.0
 compile: false
