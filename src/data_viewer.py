@@ -8,10 +8,10 @@ from matplotlib import pyplot as plt
 from glob import glob
 
 
-def my_tab1(data_type, df, idx, cmaps):
+def my_tab1(data_type, df, idx):
     col1, col2 = st.columns(2)
     with col1:
-        graph_visual(df.iloc[idx], cmaps)
+        graph_visual(df.iloc[idx])
     with col2:
         st.dataframe(df.iloc[idx].astype(str), width=int(1e3))
         if data_type == "test":
@@ -38,28 +38,18 @@ def pred_df(data_path, df):
     return df, "all"
 
 
-def get_n_colors(n, cmaps):
-    cmap = plt.get_cmap(cmaps, n)
-    colors = [cmap(i) for i in range(n)]
-    return colors
-
-
-def graph_visual(data, cmaps):
+def graph_visual(data):
     G = nx.from_edgelist(pd.read_csv(data.data_path).values.astype(int))
-    node_info = pd.read_csv(data.node_info_path)
-    node_info = {n: c for n, c in zip(node_info.node, node_info.color_idx)}
-    c = get_n_colors(max(node_info.values()) + 1, cmaps)
-    color_map = [c[node_info[n]] for n in G]
     fig = plt.figure(figsize=(5, 5))
-    nx.draw(G, node_color=color_map, with_labels=True)
+    nx.draw(G, with_labels=True)
     st.pyplot(fig)
 
 
 def gh_plot(df):
     sns.set(font_scale=3)
-    for col in ["colors", "node_number", "edge_number"]:
+    for col in ["node_number", "edge_number"]:
         fig = plt.figure(figsize=(30, 10))
-        sns.kdeplot(data=df, x=col)
+        sns.kdeplot(data=df, x=col, hue="label_name")
         plt.xlim(0, max(df[col]) * 1.1)
         st.pyplot(fig)
 
@@ -68,24 +58,30 @@ def slidebar():
     with st.sidebar:
         data_path = st.selectbox("data version을 선택해주세요.", glob("data/version*"))
         df = pd.read_csv(os.path.join(data_path, "label.csv"))
+
         data_type = st.radio("데이터 타입을 선택해주세요", ["all", "train", "valid", "test"])
         if data_type != "all":
             df = df[df["type"] == data_type]
 
+        label_name = st.radio("데이터 타입을 선택해주세요", ["all", "Bipartite", "Other"])
+        if label_name != "all":
+            df = df[df["label_name"] == label_name]
+
         idx = st.slider("data를 선택해주세요.", 0, len(df) - 1, 0, 1)
-        cmaps = st.selectbox("그래프 노드 시각화 색상을 정해주세요.", plt.colormaps(), index=65)
-        return df.reset_index(drop=True), idx, data_path, data_type, cmaps
+        return df.reset_index(drop=True), idx, data_path, data_type
 
 
 def main():
     st.title("Chromatic Number of Graphs")
 
     tab1, tab2 = st.tabs(["Data_View", "EDA"])
-    df, idx, data_path, data_type, cmaps = slidebar()
+    df, idx, data_path, data_type = slidebar()
+    df.sort_values(["node_number", "edge_number"], inplace=True)
+    df.reset_index(inplace=True, drop=True)
     if data_type == "test":
         df, data_type = pred_df(data_path, df)
     with tab1:
-        my_tab1(data_type, df, idx, cmaps)
+        my_tab1(data_type, df, idx)
     with tab2:
         gh_plot(df)
 
