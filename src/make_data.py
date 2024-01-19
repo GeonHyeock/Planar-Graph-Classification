@@ -86,20 +86,20 @@ def make_graph(args):
     df.to_csv(os.path.join(args.folder_path, "label.csv"), index=False)
 
 
-def graph_dict(args):
+def label_dict(args):
     df = pd.DataFrame(
         {
             "label_name": args.label_name,
             "label": list(range(args.label_size)),
         }
     )
-    df.to_csv(os.path.join(args.folder_path, "graph_dict.csv"), index=False)
+    df.to_csv(os.path.join(args.folder_path, "label_dict.csv"), index=False)
 
 
 def main(args):
     random_seed(args)
     create_folder(args)
-    graph_dict(args)
+    label_dict(args)
     make_graph(args)
 
 

@@ -26,15 +26,15 @@ class GCnetLitModule(LightningModule):
 
         self.net = net
         self.criterion = torch.nn.CrossEntropyLoss()
-
+        label_df = pd.read_csv(f"../data/{DataVersion}/label_dict.csv")
+        label_dict = {i: j for i, j in zip(label_df.label, label_df.label_name)}
         self.train_metric, self.valid_metric, self.test_metric = [
             MetricCollection(
                 {
                     f"{name}/Accuracy": ClasswiseWrapper(
                         MulticlassAccuracy(num_classes=net.classes, average=None),
-                        labels=[str(i) for i in range(2, net.classes + 2)],
+                        labels=[label_dict[i] for i in range(net.classes)],
                         prefix=f"{name}/Accuracy/",
-                        postfix="-Color",
                     ),
                     f"{name}/Precision": Precision(
                         task="multiclass", num_classes=net.classes, average="macro"
@@ -64,9 +64,9 @@ class GCnetLitModule(LightningModule):
 
     def model_step(self, batch):
         logits = self.forward(batch["graph"])
-        loss = self.criterion(logits, batch["colors"])
+        loss = self.criterion(logits, batch["label"])
         preds = torch.argmax(logits, dim=1)
-        return loss, preds, batch["colors"]
+        return loss, preds, batch["label"]
 
     def training_step(self, batch):
         loss, preds, targets = self.model_step(batch)

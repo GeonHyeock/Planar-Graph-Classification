@@ -121,7 +121,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     # train the model
     if "logger" in cfg.keys() and "wandb" in cfg.get("logger"):
         cfg.get("logger").wandb["group"] = cfg.get("data").data_version
-        cfg.get("model").DataVersion = cfg.get("data").data_version
+    cfg.get("model").DataVersion = cfg.get("data").data_version
     metric_dict, _ = train(cfg)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
