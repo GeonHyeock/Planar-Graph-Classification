@@ -33,7 +33,7 @@ def create_folder(args):
 
 def make_label_graph(args, label, weight_funtion=lambda x: np.log2(x + 1)):
     n_range = range(args.min_node, args.max_node + 1)
-    # 연결된 2분 그래프 생성
+    # 2분 연결그래프 생성
     if label == "Bipartite":
         is_conected, count = False, 0
         while not is_conected:
@@ -45,6 +45,8 @@ def make_label_graph(args, label, weight_funtion=lambda x: np.log2(x + 1)):
             G = nx.bipartite.random_graph(n1 - n2, n2, p)
             is_conected = nx.is_connected(G)
             count += 1
+
+    # 2분이 아닌 연결그래프 생성
     else:
         is_conected_bipartite, count = False, 0
         while not is_conected_bipartite:
@@ -64,7 +66,7 @@ def make_graph(args):
             for _ in range(args.N):
                 G = make_label_graph(args, label)
 
-                # pd.DataFrame(,columns=["color_idx","node"])
+                # 그래프 정보 csv 저장
                 data_name = str(idx).zfill(8) + ".csv"
                 data_path = os.path.join(args.folder_path, data_name)
                 data = pd.DataFrame(G.edges, columns=("n1", "n2"))
