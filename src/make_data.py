@@ -8,64 +8,61 @@ from collections import defaultdict
 from tqdm import tqdm
 
 
-def random_partition(n, k):
-    result = [1 for _ in range(k)]
-    for _ in range(n - k):
-        idx = random.randint(0, k - 1)
-        result[idx] += 1
-    return result
+def random_seed(args):
+    random.seed(args.version)
+    np.random.seed(args.version)
+    os.environ["PYTHONHASHSEED"] = str(args.version)
 
 
-def k_color_graph(n, k):
-    # 연결된 2분 그래프 생성
-    is_conected = False
-    while not is_conected:
-        partition = random_partition(n, k)
-        n1, n2 = partition[0], partition[1]
-        G = nx.bipartite.random_graph(n1, n2, p=random.choice([0.3, 0.5, 0.7]))
-        is_conected = nx.is_connected(G)
-
-    # k_color 그래프 생성
-    node_dict = nx.algorithms.bipartite.color(G)
-    nodes = [[i for i in node_dict if node_dict[i] == j] for j in [0, 1]]
-    v = sum(nodes, [])
-    for n in range(2, k):
-        new_node = range(sum(partition[:n]), sum(partition[: n + 1]))
-        for idx, node in enumerate(new_node):
-            G.add_node(node)
-            edges = set([e for e in random.sample(v, random.randint(1, len(v)))])
-            if idx == 0:
-                edges = set(edges) | set([p[0] for p in nodes])
-            G.add_edges_from([(n, node) for n in edges])
-        nodes.append(list(new_node))
-        v += list(new_node)
-    return G, nodes
-
-
-def create_folder(folder_path):
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+def create_folder(args):
+    if not os.path.exists(args.folder_path):
+        os.makedirs(args.folder_path)
     else:
         msg = ""
         while msg not in ["Y", "N"]:
             msg = input(
-                f"{folder_path}가 존재합니다 \n Y : 기존의 폴더를 삭제 -> 새로 데이터 생성합니다 \n N : 실행 중단 \n"
+                f"{args.folder_path}가 존재합니다 \n Y : 기존의 폴더를 삭제 -> 새로 데이터 생성합니다 \n N : 실행 중단 \n"
             )
 
         if msg == "Y":
-            shutil.rmtree(folder_path)
-            os.makedirs(folder_path)
+            shutil.rmtree(args.folder_path)
+            os.makedirs(args.folder_path)
         else:
             sys.exit()
 
 
+def make_label_graph(args, label, weight_funtion=lambda x: np.log2(x + 1)):
+    n_range = range(args.min_node, args.max_node + 1)
+    # 연결된 2분 그래프 생성
+    if label == "Bipartite":
+        is_conected, count = False, 0
+        while not is_conected:
+            if count // 2000 == 0:
+                p = random.choice([i / 10 for i in range(1, 10, 2)])
+                n1 = random.choices(n_range, weights=map(weight_funtion, n_range))[0]
+                n2_range = range(1, n1 // 2)
+                n2 = random.choices(n2_range, weights=map(weight_funtion, n2_range))[0]
+            G = nx.bipartite.random_graph(n1 - n2, n2, p)
+            is_conected = nx.is_connected(G)
+            count += 1
+    else:
+        is_conected_bipartite, count = False, 0
+        while not is_conected_bipartite:
+            if count // 2000 == 0:
+                n = random.choices(n_range, weights=map(weight_funtion, n_range))[0]
+                m = random.randint(n - 1, n * (n - 1) / 2)
+            G = nx.gnm_random_graph(n, m)
+            is_conected_bipartite = nx.is_connected(G) and not nx.is_bipartite(G)
+            count += 1
+    return G
+
+
 def make_graph(args):
     df, idx = defaultdict(list), 0
-    with tqdm(total=args.N * (args.k - 1)) as pbar:
-        for k in range(2, args.k + 1):
+    with tqdm(total=args.N * args.label_size) as pbar:
+        for label in args.label_name:
             for _ in range(args.N):
-                n = random.randint(k, args.node)
-                G, nodes = k_color_graph(n, k)
+                G = make_label_graph(args, label)
 
                 # pd.DataFrame(,columns=["color_idx","node"])
                 data_name = str(idx).zfill(8) + ".csv"
@@ -73,14 +70,8 @@ def make_graph(args):
                 data = pd.DataFrame(G.edges, columns=("n1", "n2"))
                 data.to_csv(data_path, index=False)
 
-                node_info_path = os.path.join(args.folder_path, "NodeInfo_" + data_name)
-                node_info = [(idx, n) for idx, node in enumerate(nodes) for n in node]
-                node_info = pd.DataFrame(node_info, columns=["color_idx", "node"])
-                node_info.to_csv(node_info_path, index=False)
-
                 df["data_path"].append(data_path)
-                df["node_info_path"].append(node_info_path)
-                df["colors"].append(k)
+                df["label_name"].append(label)
                 df["node_number"].append(len(G.nodes))
                 df["edge_number"].append(len(G.edges))
                 idx += 1
@@ -98,28 +89,30 @@ def make_graph(args):
 def graph_dict(args):
     df = pd.DataFrame(
         {
-            "color": list(range(2, args.k + 1)),
-            "label": list(range(args.k - 1)),
+            "label_name": args.label_name,
+            "label": list(range(args.label_size)),
         }
     )
     df.to_csv(os.path.join(args.folder_path, "graph_dict.csv"), index=False)
 
 
 def main(args):
-    create_folder(args.folder_path)
+    random_seed(args)
+    create_folder(args)
     graph_dict(args)
     make_graph(args)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default=2, help="data_version")
-    parser.add_argument("--node", default=50, help="그래프 노드의 개수")
-    parser.add_argument("--k", default=10, help="생성할 그래프의 최대 채색수")
-    parser.add_argument("--N", default=5000, help="채색수 별 생성할 그래프")
+    parser.add_argument("--version", default=3, help="data_version")
+    parser.add_argument("--min_node", default=10, help="그래프 노드의 최소 개수")
+    parser.add_argument("--max_node", default=50, help="그래프 노드의 최대 개수")
+    parser.add_argument("--N", default=50000, help="label별 생성할 데이터 수")
+    parser.add_argument(
+        "--label_name", nargs="+", default=["Bipartite", "Other"], help="데이터 라벨"
+    )
     args = parser.parse_args()
     args.folder_path = "./data/version_" + str(args.version).zfill(3)
-
-    random.seed(args.version)
-    np.random.seed(args.version)
+    args.label_size = len(args.label_name)
     main(args)
