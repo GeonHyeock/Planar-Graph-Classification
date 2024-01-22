@@ -31,7 +31,7 @@ def create_folder(args):
             sys.exit()
 
 
-def make_label_graph(args, label, weight_funtion=lambda x: np.log2(x + 1)):
+def make_label_graph(args, label, weight_funtion=lambda x: np.power(x, 2)):
     n_range = range(args.min_node, args.max_node + 1)
     # 연결된 2분 그래프 생성
     if label == "Bipartite":
