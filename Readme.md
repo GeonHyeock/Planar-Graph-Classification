@@ -55,6 +55,6 @@
 
 - 데이터가 랜덤하게 생성되었으므로 Train, Valid, Test 데이터에 중복이 있을 수 있다.
 - version001과 다르게 노드의 수에 비례하여 weight sampling 진행, 노드의 수가 많은수록 더 다양한 그래프가 존재하기 때문이다.
-- sampling시 weight를 어떻게 줄지 좀 더 고민! 우선은 노드의 로그값으로 주어 진행
+- sampling시 weight를 어떻게 줄지 좀 더 고민! 우선은 노드의 제곱값으로 weight (노드별 가능한 엣지수가 제곱에 비례)
 
 </details>
