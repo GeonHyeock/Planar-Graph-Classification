@@ -64,9 +64,7 @@ class LastLayer(nn.Module):
         for idx in range(layer):
             self.lastlayer.append(
                 nn.Sequential(
-                    nn.Linear(
-                        embedding_size // (2**idx), embedding_size // (2 ** (idx + 1))
-                    ),
+                    nn.Linear(embedding_size // (2**idx), embedding_size // (2 ** (idx + 1))),
                     nn.BatchNorm1d(embedding_size // (2 ** (idx + 1))),
                     nn.GELU(),
                     nn.Dropout(p=0.2),
@@ -101,7 +99,7 @@ class GCnet(nn.Module):
         x = self.convblocks(adj, x)
         if latent:
             return x
-        return self.log_soft(self.last_layer(x))
+        return self.last_layer(x)
 
 
 if __name__ == "__main__":
@@ -131,9 +129,7 @@ if __name__ == "__main__":
             net = GCnet().cuda()
             output = net(batch, latent=True)
             max_error, mean_error, min_error = errors(output)
-            print(
-                f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}"
-            )
+            print(f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}")
 
     def initial_error(G_node):
         print("base_error")
@@ -149,9 +145,7 @@ if __name__ == "__main__":
             net = GCnet().cuda()
             output = net(data, latent=True)
             max_error, mean_error, min_error = errors(output)
-            print(
-                f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}"
-            )
+            print(f"max error : {max_error:.8f}, mean error : {mean_error:.8f} min error : {min_error:.8f}")
 
     G_node = [[0, 1], [0, 2], [0, 3], [1, 2], [2, 3], [3, 4]]
     invariant_test(G_node)
