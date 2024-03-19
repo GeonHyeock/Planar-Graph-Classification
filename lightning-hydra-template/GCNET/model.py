@@ -7,32 +7,37 @@ import networkx as nx
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, node_number, embedding_size):
+    def __init__(self, node_number, embedding_size, embed_layer):
         super().__init__()
         self.embed = nn.Embedding(node_number, embedding_size, padding_idx=0)
+        self.embed_layer = embed_layer
         nn.init.xavier_uniform_(self.embed.weight[1:])
 
     def forward(self, x):
         degree = torch.sum(x, dim=1)
         embed = self.embed(degree.type(torch.long)).permute(0, 2, 1)
-        adj = x
-        return adj, embed
+        adj = torch.where(degree == 0, 1, degree).reshape([*degree.shape, 1])
+        adj = x / torch.pow(adj, 0.5)
+
+        E = [embed]
+        for _ in range(self.embed_layer):
+            E.append(E[-1] @ adj)
+        return adj, torch.stack(E).mean(axis=0)
 
 
 class ConvBlock(nn.Module):
     def __init__(self, embedding_size):
         super().__init__()
-        es = embedding_size
         self.block = nn.Sequential(
-            nn.Conv1d(es, es * 2, 1),
-            nn.BatchNorm1d(es * 2),
-            nn.ReLU(),
-            nn.Conv1d(es * 2, es * 2, 1),
-            nn.BatchNorm1d(es * 2),
-            nn.ReLU(),
-            nn.Conv1d(es * 2, es, 1),
-            nn.BatchNorm1d(es),
-            nn.ReLU(),
+            nn.Conv1d(embedding_size, embedding_size // 2, 1),
+            nn.BatchNorm1d(embedding_size // 2),
+            nn.GELU(),
+            nn.Conv1d(embedding_size // 2, embedding_size // 2, 1),
+            nn.BatchNorm1d(embedding_size // 2),
+            nn.GELU(),
+            nn.Conv1d(embedding_size // 2, embedding_size, 1),
+            nn.BatchNorm1d(embedding_size),
+            nn.GELU(),
         )
 
         for layer in self.block:
@@ -47,33 +52,30 @@ class BLOCKS(nn.Module):
     def __init__(self, embedding_size, block_layer):
         super().__init__()
         self.layers = nn.ModuleList()
-        for idx in range(block_layer):
+        for _ in range(block_layer):
             self.layers.append(ConvBlock(embedding_size))
 
     def forward(self, adj, x):
-        for idx, layer in enumerate(self.layers):
-            x = x + layer(x) @ (adj / (idx + 1))
+        for _, layer in enumerate(self.layers):
+            x = x + layer(x) @ adj
         return torch.max(x, dim=2).values
 
 
 class LastLayer(nn.Module):
-    def __init__(self, embedding_size, layer, classes):
+    def __init__(self, embedding_size, classes):
         super().__init__()
-        layer -= 1
-        self.lastlayer = nn.ModuleList()
-        for idx in range(layer):
-            self.lastlayer.append(
-                nn.Sequential(
-                    nn.Linear(embedding_size // (2**idx), embedding_size // (2 ** (idx + 1))),
-                    nn.BatchNorm1d(embedding_size // (2 ** (idx + 1))),
-                    nn.GELU(),
-                    nn.Dropout(p=0.2),
-                )
-            )
-        self.lastlayer.append(nn.Linear(embedding_size // (2 ** (layer)), classes))
+        self.lastlayer = nn.Sequential(
+            *[
+                nn.Linear(embedding_size, embedding_size // 2),
+                nn.BatchNorm1d(embedding_size // 2),
+                nn.GELU(),
+                nn.Dropout(p=0.2),
+                nn.Linear(embedding_size // 2, classes),
+            ]
+        )
 
     def forward(self, x):
-        for idx, layer in enumerate(self.lastlayer):
+        for _, layer in enumerate(self.lastlayer):
             x = layer(x)
         return x
 
@@ -82,15 +84,15 @@ class GCnet(nn.Module):
     def __init__(
         self,
         node_number=50,
-        embedding_size=256,
+        embedding_size=512,
+        embed_layer=2,
         block_layer=3,
-        last_layer=3,
-        classes=2,
+        classes=1,
     ):
         super().__init__()
-        self.embedding = EmbeddingLayer(node_number, embedding_size)
+        self.embedding = EmbeddingLayer(node_number, embedding_size, embed_layer)
         self.convblocks = BLOCKS(embedding_size, block_layer)
-        self.last_layer = LastLayer(embedding_size, last_layer, classes)
+        self.last_layer = LastLayer(embedding_size, classes)
         self.log_soft = nn.LogSoftmax(dim=1)
         self.classes = classes
 

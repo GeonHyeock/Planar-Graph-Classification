@@ -9,14 +9,14 @@ model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
   filename: "epoch_{epoch:03d}"
   monitor: "valid/MSE"
-  mode: "max"
+  mode: "min"
   save_last: True
   auto_insert_metric_name: False
 
 early_stopping:
   monitor: "valid/MSE"
   patience: 15
-  mode: "max"
+  mode: "min"
 
 model_summary:
   max_depth: -1

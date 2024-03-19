@@ -22,8 +22,8 @@ net:
   _target_: GCNET.model.GCnet
   node_number: 50
   embedding_size: 512
-  block_layer: 5
-  last_layer: 3
+  embed_layer: 2
+  block_layer: 3
   classes: 1
 
 # compile model for faster training with pytorch 2.0
