@@ -8,13 +8,13 @@ defaults:
 model_checkpoint:
   dirpath: ${paths.output_dir}/checkpoints
   filename: "epoch_{epoch:03d}"
-  monitor: "valid/F1Score"
+  monitor: "valid/MSE"
   mode: "max"
   save_last: True
   auto_insert_metric_name: False
 
 early_stopping:
-  monitor: "valid/F1Score"
+  monitor: "valid/MSE"
   patience: 15
   mode: "max"
 
