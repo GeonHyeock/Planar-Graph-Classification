@@ -31,16 +31,17 @@ def create_folder(args):
             sys.exit()
 
 
-def make_label_graph(args, weight_funtion=lambda x: np.power(x, 2)):
+def make_label_graph(args, weight_funtion=lambda x: x * (x - 1)):
     n_range = range(args.min_node, args.max_node + 1)
 
-    is_conected_bipartite, count = False, 0
-    while not is_conected_bipartite:
+    is_conected, count = False, 0
+    while not is_conected:
         if count // 1000 == 0:
             n = random.choices(n_range, weights=map(weight_funtion, n_range))[0]
-            m = random.randint(n - 1, n * (n - 1) / 2)
+            m_range = range(n - 1, n * (n - 1) // 2)
+            m = random.choices(m_range)[0]
         G = nx.gnm_random_graph(n, m)
-        is_conected_bipartite = nx.is_connected(G)
+        is_conected = nx.is_connected(G)
         count += 1
 
     label, r = divmod(sum(nx.triangles(G).values()), 3)
@@ -94,10 +95,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default=4, help="data_version")
+    parser.add_argument("--version", default=5, help="data_version")
     parser.add_argument("--min_node", default=10, help="그래프 노드의 최소 개수")
-    parser.add_argument("--max_node", default=50, help="그래프 노드의 최대 개수")
-    parser.add_argument("--N", default=50000, help="Sample_size")
+    parser.add_argument("--max_node", default=100, help="그래프 노드의 최대 개수")
+    parser.add_argument("--N", default=100000, help="Sample_size")
     parser.add_argument("--label_name", nargs="+", default=[], help="데이터 라벨")
     args = parser.parse_args()
     args.folder_path = "./data/version_" + str(args.version).zfill(3)
