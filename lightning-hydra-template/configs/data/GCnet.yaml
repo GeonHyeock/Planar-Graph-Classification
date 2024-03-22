@@ -4,4 +4,4 @@ batch_size: 256
 test_batch_size: 1
 num_workers: 2
 pin_memory: False
-data_version: version_004
+data_version: version_006
