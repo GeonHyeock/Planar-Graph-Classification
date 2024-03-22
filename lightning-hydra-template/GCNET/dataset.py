@@ -17,10 +17,9 @@ class GraphDataset(Dataset):
 
     def __getitem__(self, idx):
         d = dict(self.data.iloc[idx])
-        G = pd.read_csv(os.path.join(self.data_folder, d["data_path"])).values
-        G = nx.to_numpy_array(nx.from_edgelist(G))
+        G = nx.read_adjlist(os.path.join(self.data_folder, d["data_path"]))
+        G = nx.to_numpy_array(G)
         d.update({"graph": G})
-        d["label"] = np.log1p(d["label_name"])
         return d
 
 

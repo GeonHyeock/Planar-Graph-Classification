@@ -98,3 +98,23 @@
 - sampling시 weight를 어떻게 줄지 좀 더 고민! 우선은 노드의 제곱값으로 weight (노드별 가능한 엣지수가 제곱에 비례)
 
 </details>
+
+<details>
+<summary>Version006</summary>
+
+### 특징
+
+- 그래프는 연결그래프만을 대상으로 한다.
+- 그래프의 정보는 nx format을 기반으로 한다. : https://networkx.org/documentation/stable/reference/readwrite/adjlist.html
+- Label은 그래프가 평면인지 여부
+- 최소 노드수를 10으로 진행한다.
+- 최대 노드수를 100으로 진행한다.
+- 평면그래프는 해당 사이트의 데이터에서 샘플링해서 사용 : http://www.inf.udec.cl/~jfuentess/datasets/graphs.php
+
+#### 문제 및 고려할 점
+
+- 데이터가 랜덤하게 생성되었으므로 Train, Valid, Test 데이터에 중복이 있을 수 있다.
+- weight sampling 진행, 노드의 수가 많은수록 더 다양한 그래프가 존재하기 때문이다.
+- sampling시 weight를 어떻게 줄지 좀 더 고민! 우선은 노드의 제곱값으로 weight (노드별 가능한 엣지수가 제곱에 비례)
+
+</details>
