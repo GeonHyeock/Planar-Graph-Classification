@@ -21,14 +21,14 @@ scheduler_frequency: 1
 net:
   _target_: GCNET.model.GCnet
   node_number: 50
-  embedding_size: 512
+  embedding_size: 128
   embed_layer: 2
   n_layers: 3
-  hidden_size: 256
+  hidden_size: 64
   n_head: 8
   drop_prob: 0.1
-  last_layer_dim: [256, 1]
-  is_prob: False
+  last_layer_dim: [64, 2]
+  is_prob: True
 
 # compile model for faster training with pytorch 2.0
 compile: false
