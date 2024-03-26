@@ -18,19 +18,18 @@ class GraphDataset(Dataset):
     def __getitem__(self, idx):
         d = dict(self.data.iloc[idx])
         G = nx.read_adjlist(os.path.join(self.data_folder, d["data_path"]))
-        G = nx.to_numpy_array(G)
         d.update({"graph": G})
         return d
 
 
 def my_collate_fn(batch):
     b = pd.DataFrame(batch)
-    max_size = b.graph.apply(len).max()
-    b.graph = b.graph.apply(lambda x: my_padding(x, max_size))
+    max_size = b.graph.apply(lambda x: x.number_of_nodes()).max()
+    b.graph = b.graph.apply(lambda x: my_padding(nx.to_numpy_array(x), max_size))
     b = b.to_dict(orient="list")
 
     b["graph"] = torch.stack(b["graph"]).type(torch.float32)
-    b["label"] = torch.tensor(b["label"]).type(torch.float32)
+    b["label"] = torch.tensor(b["label_name"]).type(torch.long)
     return b
 
 
