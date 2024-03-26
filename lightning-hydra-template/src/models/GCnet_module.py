@@ -3,12 +3,11 @@ from typing import Any, Dict
 import torch
 import pandas as pd
 import os
-from lightning.pytorch.loggers.wandb import WandbLogger
-
-from lightning import LightningModule
-from torchmetrics import MeanMetric
-from torchmetrics.regression import MeanSquaredError
 from collections import defaultdict
+from lightning.pytorch.loggers.wandb import WandbLogger
+from lightning import LightningModule
+from torchmetrics import MeanMetric, MetricCollection
+from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
 
 
 class GCnetLitModule(LightningModule):
@@ -25,8 +24,20 @@ class GCnetLitModule(LightningModule):
         self.save_hyperparameters(logger=True)
 
         self.net = net
-        self.criterion = torch.nn.MSELoss()
-        self.train_metric, self.valid_metric, self.test_metric = MeanSquaredError(), MeanSquaredError(), MeanSquaredError()
+        self.criterion = torch.nn.CrossEntropyLoss()
+        label_path = os.path.join(os.getcwd(), f"../data/{self.hparams.DataVersion}/label_dict.csv")
+        self.label_df = pd.read_csv(label_path)
+        self.train_metric, self.valid_metric, self.test_metric = [
+            MetricCollection(
+                {
+                    f"{name}/Accuracy": Accuracy(task="multiclass", num_classes=len(self.label_df), average="micro"),
+                    f"{name}/Precision": Precision(task="multiclass", num_classes=len(self.label_df), average="macro"),
+                    f"{name}/Recall": Recall(task="multiclass", num_classes=len(self.label_df), average="macro"),
+                    f"{name}/F1Score": F1Score(task="multiclass", num_classes=len(self.label_df), average="macro"),
+                }
+            )
+            for name in ["train", "valid", "test"]
+        ]
 
         self.train_loss = MeanMetric()
         self.valid_loss = MeanMetric()
@@ -41,24 +52,21 @@ class GCnetLitModule(LightningModule):
         pass
 
     def model_step(self, batch):
-        preds = self.forward(batch["graph"]).flatten()
-        loss = self.criterion(preds, batch["label"])
-        # return loss, torch.exp(preds) - 1, torch.exp(batch["label"]) - 1
+        logit = self.forward(batch["graph"])
+        loss = self.criterion(logit, batch["label"])
+        preds = torch.argmax(logit, dim=-1)
         return loss, preds, batch["label"]
 
     def training_step(self, batch):
         loss, preds, targets = self.model_step(batch)
-
         self.train_loss(loss)
         self.train_metric(preds, targets)
+        self.log_dict(self.train_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
-
         return loss
 
     def on_train_epoch_end(self):
-        metric = self.train_metric.compute()
-        self.log_dict({"train/MSE": metric.cpu()})
-        self.train_metric.reset()
+        pass
 
     def validation_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
@@ -66,13 +74,11 @@ class GCnetLitModule(LightningModule):
         # update and log metrics
         self.valid_loss(loss)
         self.valid_metric(preds, targets)
-
+        self.log_dict(self.valid_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log("valid/loss", self.valid_loss, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
-        metric = self.valid_metric.compute()
-        self.log_dict({"valid/MSE": metric.cpu()})
-        self.valid_metric.reset()
+        pass
 
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
@@ -85,11 +91,11 @@ class GCnetLitModule(LightningModule):
         # update and log metrics
         self.test_loss(loss)
         self.test_metric(preds, targets)
+        self.log_dict(self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self):
-        metric = self.test_metric.compute()
-        self.log_dict({"test/MSE": metric.cpu()})
+        self.log_dict(self.test_metric)
         self.test_metric.reset()
 
         result_df = pd.DataFrame(self.test_result)
