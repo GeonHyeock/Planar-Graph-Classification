@@ -7,12 +7,13 @@ class ScaleDotProductAttention(nn.Module):
         super().__init__()
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, q, k, v, adj):
+    def forward(self, q, k, v, adj, latent):
         k_t = k.transpose(2, 3)
-        score = ((q @ k_t) * adj).masked_fill(adj == 0, float("-inf"))
+        score = (q @ k_t) * adj.unsqueeze(1)
+        score = score.masked_fill(adj.unsqueeze(1) == 0, float("-inf"))
         score = torch.nan_to_num(self.softmax(score))
         v = score @ v
-        return v
+        return (v, None) if not latent else (v, score)
 
 
 class MultiHeadAttention(nn.Module):
@@ -26,12 +27,12 @@ class MultiHeadAttention(nn.Module):
         self.w_v = nn.Conv1d(embedding_size, embedding_size, 1)
         self.w_concat = nn.Conv1d(embedding_size, embedding_size, 1)
 
-    def forward(self, q, k, v, adj):
+    def forward(self, q, k, v, adj, latent):
         q, k, v = self.w_q(q), self.w_k(k), self.w_v(v)
         q, k, v = self.split(q), self.split(k), self.split(v)
-        out = self.attention(q, k, v, adj)
+        out, score = self.attention(q, k, v, adj, latent)
         out = self.w_concat(self.concat(out))
-        return out
+        return out, score
 
     def split(self, tensor):
         batch_size, embedding_size, node_size = tensor.size()
@@ -71,9 +72,9 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(p=drop_prob)
         self.norm2 = nn.BatchNorm1d(embedding_size)
 
-    def forward(self, x, adj):
+    def forward(self, x, adj, latent):
         _x = x
-        x = self.attention(q=x, k=x, v=x, adj=adj)
+        x, score = self.attention(x, x, x, adj, latent)
         x = self.dropout1(x)
         x = self.norm1(x + _x)
 
@@ -81,4 +82,4 @@ class EncoderLayer(nn.Module):
         x = self.ffn(x)
         x = self.dropout2(x)
         x = self.norm2(x + _x)
-        return x
+        return x, score

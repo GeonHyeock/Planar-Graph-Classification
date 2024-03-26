@@ -25,9 +25,9 @@ class GCnet(nn.Module):
 
     def forward(self, x, latent=False):
         emb, adj = self.embedding(x)
-        x = self.encoder(emb, adj)
+        x, scores = self.encoder(emb, adj, latent)
         if latent:
-            return x
+            return {"latent": x, "scores": scores}
         return self.last(x)
 
 
@@ -36,6 +36,7 @@ if __name__ == "__main__":
 
     def cos_sims(output):
         cos_sims = []
+        output = output["latent"]
         for i in range(len(output)):
             for j in range(i + 1, len(output)):
                 cos_sim = torch.dot(output[i], output[j]) / torch.norm(output[i]) / torch.norm(output[j])

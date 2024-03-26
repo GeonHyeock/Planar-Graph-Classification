@@ -9,11 +9,11 @@ class EmbeddingLayer(nn.Module):
         self.embed = nn.Embedding(node_number, embedding_size, padding_idx=0)
         self.embed_layer = embed_layer
 
-    def forward(self, x):
-        degree = torch.sum(x, dim=1)
+    def forward(self, adj):
+        degree = torch.sum(adj, dim=-1)
         embed = self.embed(degree.type(torch.long)).permute(0, 2, 1)
-        adj = torch.where(degree > 0, 1 / torch.pow(degree, 0.5), 0)
-        adj = x * adj.reshape([*degree.shape, 1])
+        D = torch.where(degree > 0, 1 / degree, 0).unsqueeze(1)
+        adj = adj * D
 
         emb = [embed]
         for _ in range(self.embed_layer):
@@ -25,23 +25,23 @@ class EmbeddingLayer(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, embedding_size, hidden_size, n_head, n_layers, drop_prob):
         super().__init__()
-        self.n_head = n_head
         self.layers = nn.ModuleList([EncoderLayer(embedding_size, hidden_size, n_head, drop_prob) for _ in range(n_layers)])
 
-    def forward(self, x, adj):
-        batch_size, _, node_size = x.shape
-        adj = torch.unsqueeze(adj, 1).expand(batch_size, self.n_head, node_size, node_size)
+    def forward(self, x, adj, latent):
+        scores = []
         for layer in self.layers:
-            x = layer(x, adj)
+            x, score = layer(x, adj, latent)
+            if latent:
+                scores.append(score)
         x = torch.max(x, dim=-1).values
-        return x
+        return (x, None) if not latent else (x, scores)
 
 
 class LastLayer(nn.Module):
     def __init__(self, embedding_size, last_layer_dim, drop_prob, is_prob):
         super().__init__()
         self.is_prob = is_prob
-        self.log_soft = nn.LogSoftmax(dim=1)
+        self.log_soft = nn.Softmax(dim=-1)
 
         dim = [embedding_size] + last_layer_dim
         last_layer = []
