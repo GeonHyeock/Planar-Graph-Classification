@@ -81,7 +81,7 @@ class GIN(torch.nn.Module):
         self.nns = torch.nn.ModuleList(self.nns)
         self.convs = torch.nn.ModuleList(self.convs)
         self.linears = torch.nn.ModuleList(self.linears)  # has got one more for initial input
-        self.soft_max = Softmax(dim=-1)
+        self.softmax = Softmax(dim=-1)
 
     def forward(self, data):
         if data.shape[0] > 1:
@@ -90,7 +90,7 @@ class GIN(torch.nn.Module):
             x = self.online_forward(data.squeeze())
         return self.softmax(x)
 
-    def online_foward(self, data, batch=None):
+    def online_forward(self, data, batch=None):
         x = self.emb(torch.sum(data, dim=-1).type(torch.long))
         edge_index, _ = dense_to_sparse(data)
 
