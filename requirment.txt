@@ -29,3 +29,4 @@ streamlit==1.29.0
 pandas==2.1.4
 scipy==1.10.1
 seaborn==0.13.0
+torch_geometric==2.5.2
