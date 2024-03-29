@@ -24,8 +24,9 @@ net:
   embedding_size: 128
   nfeat: 128
   nhid: 64
-  nclass: 2
   dropout: 0.1
+  last_layer_dim: [64,2]
+  is_prob: True
 
 # compile model for faster training with pytorch 2.0
 compile: false
