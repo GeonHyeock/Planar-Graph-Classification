@@ -18,7 +18,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch_geometric.nn import MessagePassing, global_sort_pool
-from torch_geometric.utils import add_self_loops, degree
+from torch_geometric.utils import add_self_loops, degree, dense_to_sparse
 
 
 class DGCNN(nn.Module):
@@ -26,32 +26,19 @@ class DGCNN(nn.Module):
     Uses fixed architecture
     """
 
-    def __init__(self, dim_features, dim_target, config):
+    def __init__(self, node_number, embedding_size, dim_features, num_layers, dense_dim, dim_target, k):
         super(DGCNN, self).__init__()
 
-        self.ks = {'NCI1': { '0.6': 30, '0.9': 46 },
-                   'PROTEINS_full': { '0.6': 32, '0.9': 81 },
-                   'DD': {'0.6': 291, '0.9': 503 },
-                   'ENZYMES': { '0.6': 36, '0.9': 48 },
-                   'IMDB-BINARY': { '0.6': 18, '0.9': 31 },
-                   'IMDB-MULTI': { '0.6': 11, '0.9': 22 },
-                   'REDDIT-BINARY': { '0.6': 370, '0.9': 1002 },
-                   'REDDIT-MULTI-5K': { '0.6': 469, '0.9': 1081 },
-                   'COLLAB': { '0.6': 61, '0.9': 130 },
-                   }
-
-        self.k = self.ks[config.dataset.name][str(config['k'])]
-        self.embedding_dim = config['embedding_dim']
-        self.num_layers = config['num_layers']
-
+        self.k = k
+        self.emb = nn.Embedding(node_number, embedding_size)
         self.convs = []
-        for layer in range(self.num_layers):
-            input_dim = dim_features if layer == 0 else self.embedding_dim
-            self.convs.append(DGCNNConv(input_dim, self.embedding_dim))
-        self.total_latent_dim = self.num_layers * self.embedding_dim
+        for layer in range(num_layers):
+            input_dim = embedding_size if layer == 0 else dim_features
+            self.convs.append(DGCNNConv(input_dim, dim_features))
+        self.total_latent_dim = num_layers * dim_features
 
         # Add last embedding
-        self.convs.append(DGCNNConv(self.embedding_dim, 1))
+        self.convs.append(DGCNNConv(dim_features, 1))
         self.total_latent_dim += 1
 
         self.convs = nn.ModuleList(self.convs)
@@ -64,16 +51,27 @@ class DGCNN(nn.Module):
         dense_dim = int((self.k - 2) / 2 + 1)
         self.input_dense_dim = (dense_dim - 5 + 1) * 32
 
-        self.hidden_dense_dim = config['dense_dim']
-        self.dense_layer = nn.Sequential(nn.Linear(self.input_dense_dim, self.hidden_dense_dim),
-                                         nn.ReLU(),
-                                         nn.Dropout(p=0.5),
-                                         nn.Linear(self.hidden_dense_dim, dim_target))
+        self.hidden_dense_dim = dense_dim
+        self.dense_layer = nn.Sequential(
+            nn.Linear(self.input_dense_dim, self.hidden_dense_dim),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+            nn.Linear(self.hidden_dense_dim, dim_target),
+        )
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, data):
+        if data.shape[0] > 1:
+            x = torch.stack([self.online_forward(d) for d in data]).squeeze()
+        else:
+            x = self.online_forward(data.squeeze())
+        return self.softmax(x)
+
+    def online_forward(self, data, batch=None):
         # Implement Equation 4.2 of the paper i.e. concat all layers' graph representations and apply linear model
         # note: this can be decomposed in one smaller linear model per layer
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        x = self.emb(torch.sum(data, dim=-1).type(torch.long))
+        edge_index, _ = dense_to_sparse(data)
 
         hidden_repres = []
 
@@ -103,7 +101,7 @@ class DGCNNConv(MessagePassing):
     """
 
     def __init__(self, in_channels, out_channels):
-        super(DGCNNConv, self).__init__(aggr='add')  # "Add" aggregation.
+        super(DGCNNConv, self).__init__(aggr="add")  # "Add" aggregation.
         self.lin = nn.Linear(in_channels, out_channels)
 
     def forward(self, x, edge_index):
@@ -137,5 +135,4 @@ class DGCNNConv(MessagePassing):
         return aggr_out
 
     def __repr__(self):
-        return '{}({}, {})'.format(self.__class__.__name__, self.in_channels,
-                                   self.out_channels)
+        return "{}({}, {})".format(self.__class__.__name__, self.in_channels, self.out_channels)
