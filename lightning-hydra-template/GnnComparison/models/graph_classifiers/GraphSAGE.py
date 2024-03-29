@@ -17,41 +17,50 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch_geometric.utils import dense_to_sparse
 from torch_geometric.nn import SAGEConv, global_max_pool
 
 
 class GraphSAGE(nn.Module):
-    def __init__(self, dim_features, dim_target, config):
+    def __init__(self, node_number, embedding_size, dim_features, dim_target, aggregation, num_layers):
         super().__init__()
 
-        num_layers = config['num_layers']
-        dim_embedding = config['dim_embedding']
-        self.aggregation = config['aggregation']  # can be mean or max
+        self.aggregation = aggregation
+        self.emb = nn.Embedding(node_number, embedding_size, padding_idx=0)
 
-        if self.aggregation == 'max':
-            self.fc_max = nn.Linear(dim_embedding, dim_embedding)
+        if self.aggregation == "max":
+            self.fc_max = nn.Linear(embedding_size, embedding_size)
 
         self.layers = nn.ModuleList([])
         for i in range(num_layers):
-            dim_input = dim_features if i == 0 else dim_embedding
+            dim_input = embedding_size if i == 0 else dim_features
 
             # Overwrite aggregation method (default is set to mean
-            conv = SAGEConv(dim_input, dim_embedding, aggr=self.aggregation)
+            conv = SAGEConv(dim_input, dim_features, aggr=self.aggregation)
 
             self.layers.append(conv)
 
         # For graph classification
-        self.fc1 = nn.Linear(num_layers * dim_embedding, dim_embedding)
-        self.fc2 = nn.Linear(dim_embedding, dim_target)
+        self.fc1 = nn.Linear(num_layers * dim_features, dim_features)
+        self.fc2 = nn.Linear(dim_features, dim_target)
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        if data.shape[0] > 1:
+            x = torch.stack([self.online_forward(d) for d in data]).squeeze()
+        else:
+            x = self.online_forward(data.squeeze())
+        return self.softmax(x)
+
+    def online_forward(self, data, batch=None):
+        x = self.emb(torch.sum(data, dim=-1).type(torch.long))
+        edge_index, _ = dense_to_sparse(data)
 
         x_all = []
 
         for i, layer in enumerate(self.layers):
             x = layer(x, edge_index)
-            if self.aggregation == 'max':
+            if self.aggregation == "max":
                 x = torch.relu(self.fc_max(x))
             x_all.append(x)
 
