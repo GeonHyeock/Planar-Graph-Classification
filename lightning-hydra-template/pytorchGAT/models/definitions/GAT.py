@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
+from GCNET.layer import LastLayer
 
 
-from utils.constants import LayerType
+from pytorchGAT.utils.constants import LayerType
 
 
 class GAT(torch.nn.Module):
@@ -17,10 +18,25 @@ class GAT(torch.nn.Module):
 
     """
 
-    def __init__(self, num_of_layers, num_heads_per_layer, num_features_per_layer, add_skip_connection=True, bias=True,
-                 dropout=0.6, layer_type=LayerType.IMP3, log_attention_weights=False):
+    def __init__(
+        self,
+        node_number,
+        embedding_size,
+        num_of_layers,
+        num_heads_per_layer,
+        num_features_per_layer,
+        add_skip_connection=True,
+        bias=True,
+        dropout=0.6,
+        layer_type=LayerType.IMP3,
+        log_attention_weights=False,
+        last_layer_dim=[64, 2],
+        is_prob=True,
+    ):
         super().__init__()
-        assert num_of_layers == len(num_heads_per_layer) == len(num_features_per_layer) - 1, f'Enter valid arch params.'
+        assert num_of_layers == len(num_heads_per_layer) == len(num_features_per_layer) - 1, f"Enter valid arch params."
+
+        self.emb = nn.Embedding(node_number, embedding_size, padding_idx=0)
 
         GATLayer = get_layer_type(layer_type)  # fetch one of 3 available implementations
         num_heads_per_layer = [1] + num_heads_per_layer  # trick - so that I can nicely create GAT layers below
@@ -29,14 +45,14 @@ class GAT(torch.nn.Module):
         for i in range(num_of_layers):
             layer = GATLayer(
                 num_in_features=num_features_per_layer[i] * num_heads_per_layer[i],  # consequence of concatenation
-                num_out_features=num_features_per_layer[i+1],
-                num_of_heads=num_heads_per_layer[i+1],
+                num_out_features=num_features_per_layer[i + 1],
+                num_of_heads=num_heads_per_layer[i + 1],
                 concat=True if i < num_of_layers - 1 else False,  # last GAT layer does mean avg, the others do concat
                 activation=nn.ELU() if i < num_of_layers - 1 else None,  # last layer just outputs raw scores
                 dropout_prob=dropout,
                 add_skip_connection=add_skip_connection,
                 bias=bias,
-                log_attention_weights=log_attention_weights
+                log_attention_weights=log_attention_weights,
             )
             gat_layers.append(layer)
 
@@ -44,10 +60,19 @@ class GAT(torch.nn.Module):
             *gat_layers,
         )
 
+        self.last_layer = LastLayer(embedding_size, last_layer_dim, dropout, is_prob)
+
     # data is just a (in_nodes_features, topology) tuple, I had to do it like this because of the nn.Sequential:
     # https://discuss.pytorch.org/t/forward-takes-2-positional-arguments-but-3-were-given-for-nn-sqeuential-with-linear-layers/65698
-    def forward(self, data):
-        return self.gat_net(data)
+    def forward(self, adj):
+        result = []
+        for A in adj:
+            in_nodes_features = self.emb(torch.sum(A, dim=-1).type(torch.long))
+            edge_index = torch.transpose(torch.nonzero(A), 0, 1)
+            output, _ = self.gat_net((in_nodes_features, edge_index))
+            result.append(output.max(dim=0).values)
+        result = torch.stack(result)
+        return self.last_layer(result)
 
 
 class GATLayer(torch.nn.Module):
@@ -58,8 +83,19 @@ class GATLayer(torch.nn.Module):
 
     head_dim = 1
 
-    def __init__(self, num_in_features, num_out_features, num_of_heads, layer_type, concat=True, activation=nn.ELU(),
-                 dropout_prob=0.6, add_skip_connection=True, bias=True, log_attention_weights=False):
+    def __init__(
+        self,
+        num_in_features,
+        num_out_features,
+        num_of_heads,
+        layer_type,
+        concat=True,
+        activation=nn.ELU(),
+        dropout_prob=0.6,
+        add_skip_connection=True,
+        bias=True,
+        log_attention_weights=False,
+    ):
 
         super().__init__()
 
@@ -99,12 +135,12 @@ class GATLayer(torch.nn.Module):
         elif bias and not concat:
             self.bias = nn.Parameter(torch.Tensor(num_out_features))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         if add_skip_connection:
             self.skip_proj = nn.Linear(num_in_features, num_of_heads * num_out_features, bias=False)
         else:
-            self.register_parameter('skip_proj', None)
+            self.register_parameter("skip_proj", None)
 
         #
         # End of trainable weights
@@ -184,15 +220,35 @@ class GATLayerImp3(GATLayer):
     src_nodes_dim = 0  # position of source nodes in edge index
     trg_nodes_dim = 1  # position of target nodes in edge index
 
-    nodes_dim = 0      # node dimension/axis
-    head_dim = 1       # attention head dimension/axis
+    nodes_dim = 0  # node dimension/axis
+    head_dim = 1  # attention head dimension/axis
 
-    def __init__(self, num_in_features, num_out_features, num_of_heads, concat=True, activation=nn.ELU(),
-                 dropout_prob=0.6, add_skip_connection=True, bias=True, log_attention_weights=False):
+    def __init__(
+        self,
+        num_in_features,
+        num_out_features,
+        num_of_heads,
+        concat=True,
+        activation=nn.ELU(),
+        dropout_prob=0.6,
+        add_skip_connection=True,
+        bias=True,
+        log_attention_weights=False,
+    ):
 
         # Delegate initialization to the base class
-        super().__init__(num_in_features, num_out_features, num_of_heads, LayerType.IMP3, concat, activation, dropout_prob,
-                      add_skip_connection, bias, log_attention_weights)
+        super().__init__(
+            num_in_features,
+            num_out_features,
+            num_of_heads,
+            LayerType.IMP3,
+            concat,
+            activation,
+            dropout_prob,
+            add_skip_connection,
+            bias,
+            log_attention_weights,
+        )
 
     def forward(self, data):
         #
@@ -201,7 +257,7 @@ class GATLayerImp3(GATLayer):
 
         in_nodes_features, edge_index = data  # unpack data
         num_of_nodes = in_nodes_features.shape[self.nodes_dim]
-        assert edge_index.shape[0] == 2, f'Expected edge index with shape=(2,E) got {edge_index.shape}'
+        assert edge_index.shape[0] == 2, f"Expected edge index with shape=(2,E) got {edge_index.shape}"
 
         # shape = (N, FIN) where N - number of nodes in the graph, FIN - number of input features per node
         # We apply the dropout to all of the input node features (as mentioned in the paper)
@@ -228,7 +284,9 @@ class GATLayerImp3(GATLayer):
         # the possible combinations of scores we just prepare those that will actually be used and those are defined
         # by the edge index.
         # scores shape = (E, NH), nodes_features_proj_lifted shape = (E, NH, FOUT), E - number of edges in the graph
-        scores_source_lifted, scores_target_lifted, nodes_features_proj_lifted = self.lift(scores_source, scores_target, nodes_features_proj, edge_index)
+        scores_source_lifted, scores_target_lifted, nodes_features_proj_lifted = self.lift(
+            scores_source, scores_target, nodes_features_proj, edge_index
+        )
         scores_per_edge = self.leakyReLU(scores_source_lifted + scores_target_lifted)
 
         # shape = (E, NH, 1)
@@ -246,7 +304,9 @@ class GATLayerImp3(GATLayer):
 
         # This part sums up weighted and projected neighborhood feature vectors for every target node
         # shape = (N, NH, FOUT)
-        out_nodes_features = self.aggregate_neighbors(nodes_features_proj_lifted_weighted, edge_index, in_nodes_features, num_of_nodes)
+        out_nodes_features = self.aggregate_neighbors(
+            nodes_features_proj_lifted_weighted, edge_index, in_nodes_features, num_of_nodes
+        )
 
         #
         # Step 4: Residual/skip connections, concat and bias
@@ -348,21 +408,41 @@ class GATLayerImp3(GATLayer):
 
 class GATLayerImp2(GATLayer):
     """
-        Implementation #2 was inspired by the official GAT implementation: https://github.com/PetarV-/GAT
+    Implementation #2 was inspired by the official GAT implementation: https://github.com/PetarV-/GAT
 
-        It's conceptually simpler than implementation #3 but computationally much less efficient.
+    It's conceptually simpler than implementation #3 but computationally much less efficient.
 
-        Note: this is the naive implementation not the sparse one and it's only suitable for a transductive setting.
-        It would be fairly easy to make it work in the inductive setting as well but the purpose of this layer
-        is more educational since it's way less efficient than implementation 3.
+    Note: this is the naive implementation not the sparse one and it's only suitable for a transductive setting.
+    It would be fairly easy to make it work in the inductive setting as well but the purpose of this layer
+    is more educational since it's way less efficient than implementation 3.
 
     """
 
-    def __init__(self, num_in_features, num_out_features, num_of_heads, concat=True, activation=nn.ELU(),
-                 dropout_prob=0.6, add_skip_connection=True, bias=True, log_attention_weights=False):
+    def __init__(
+        self,
+        num_in_features,
+        num_out_features,
+        num_of_heads,
+        concat=True,
+        activation=nn.ELU(),
+        dropout_prob=0.6,
+        add_skip_connection=True,
+        bias=True,
+        log_attention_weights=False,
+    ):
 
-        super().__init__(num_in_features, num_out_features, num_of_heads, LayerType.IMP2, concat, activation, dropout_prob,
-                         add_skip_connection, bias, log_attention_weights)
+        super().__init__(
+            num_in_features,
+            num_out_features,
+            num_of_heads,
+            LayerType.IMP2,
+            concat,
+            activation,
+            dropout_prob,
+            add_skip_connection,
+            bias,
+            log_attention_weights,
+        )
 
     def forward(self, data):
         #
@@ -371,8 +451,10 @@ class GATLayerImp2(GATLayer):
 
         in_nodes_features, connectivity_mask = data  # unpack data
         num_of_nodes = in_nodes_features.shape[0]
-        assert connectivity_mask.shape == (num_of_nodes, num_of_nodes), \
-            f'Expected connectivity matrix with shape=({num_of_nodes},{num_of_nodes}), got shape={connectivity_mask.shape}.'
+        assert connectivity_mask.shape == (
+            num_of_nodes,
+            num_of_nodes,
+        ), f"Expected connectivity matrix with shape=({num_of_nodes},{num_of_nodes}), got shape={connectivity_mask.shape}."
 
         # shape = (N, FIN) where N - number of nodes in the graph, FIN - number of input features per node
         # We apply the dropout to all of the input node features (as mentioned in the paper)
@@ -428,16 +510,37 @@ class GATLayerImp2(GATLayer):
 
 class GATLayerImp1(GATLayer):
     """
-        This implementation is only suitable for a transductive setting.
-        It would be fairly easy to make it work in the inductive setting as well but the purpose of this layer
-        is more educational since it's way less efficient than implementation 3.
+    This implementation is only suitable for a transductive setting.
+    It would be fairly easy to make it work in the inductive setting as well but the purpose of this layer
+    is more educational since it's way less efficient than implementation 3.
 
     """
-    def __init__(self, num_in_features, num_out_features, num_of_heads, concat=True, activation=nn.ELU(),
-                 dropout_prob=0.6, add_skip_connection=True, bias=True, log_attention_weights=False):
 
-        super().__init__(num_in_features, num_out_features, num_of_heads, LayerType.IMP1, concat, activation, dropout_prob,
-                         add_skip_connection, bias, log_attention_weights)
+    def __init__(
+        self,
+        num_in_features,
+        num_out_features,
+        num_of_heads,
+        concat=True,
+        activation=nn.ELU(),
+        dropout_prob=0.6,
+        add_skip_connection=True,
+        bias=True,
+        log_attention_weights=False,
+    ):
+
+        super().__init__(
+            num_in_features,
+            num_out_features,
+            num_of_heads,
+            LayerType.IMP1,
+            concat,
+            activation,
+            dropout_prob,
+            add_skip_connection,
+            bias,
+            log_attention_weights,
+        )
 
     def forward(self, data):
         #
@@ -446,8 +549,10 @@ class GATLayerImp1(GATLayer):
 
         in_nodes_features, connectivity_mask = data  # unpack data
         num_of_nodes = in_nodes_features.shape[0]
-        assert connectivity_mask.shape == (num_of_nodes, num_of_nodes), \
-            f'Expected connectivity matrix with shape=({num_of_nodes},{num_of_nodes}), got shape={connectivity_mask.shape}.'
+        assert connectivity_mask.shape == (
+            num_of_nodes,
+            num_of_nodes,
+        ), f"Expected connectivity matrix with shape=({num_of_nodes},{num_of_nodes}), got shape={connectivity_mask.shape}."
 
         # shape = (N, FIN) where N - number of nodes in the graph, FIN number of input features per node
         # We apply the dropout to all of the input node features (as mentioned in the paper)
@@ -498,7 +603,7 @@ class GATLayerImp1(GATLayer):
 # Helper functions
 #
 def get_layer_type(layer_type):
-    assert isinstance(layer_type, LayerType), f'Expected {LayerType} got {type(layer_type)}.'
+    assert isinstance(layer_type, LayerType), f"Expected {LayerType} got {type(layer_type)}."
 
     if layer_type == LayerType.IMP1:
         return GATLayerImp1
@@ -507,6 +612,4 @@ def get_layer_type(layer_type):
     elif layer_type == LayerType.IMP3:
         return GATLayerImp3
     else:
-        raise Exception(f'Layer type {layer_type} not yet supported.')
-
-
+        raise Exception(f"Layer type {layer_type} not yet supported.")
