@@ -17,7 +17,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch_geometric.utils import dense_to_sparse
+from torch_geometric.utils import dense_to_sparse, to_dense_adj
 from torch_geometric.nn import SAGEConv, global_max_pool
 
 
@@ -45,16 +45,9 @@ class GraphSAGE(nn.Module):
         self.fc2 = nn.Linear(dim_features, dim_target)
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, data):
-        if data.shape[0] > 1:
-            x = torch.stack([self.online_forward(d) for d in data]).squeeze()
-        else:
-            x = self.online_forward(data.squeeze())
-        return self.softmax(x)
-
-    def online_forward(self, data, batch=None):
-        x = self.emb(torch.sum(data, dim=-1).type(torch.long))
-        edge_index, _ = dense_to_sparse(data)
+    def forward(self, x):
+        x, edge_index, batch = x
+        x = self.emb(x)
 
         x_all = []
 
@@ -69,4 +62,4 @@ class GraphSAGE(nn.Module):
 
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        return x
+        return self.softmax(x)

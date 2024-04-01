@@ -4,6 +4,7 @@ from GCNET.layer import LastLayer
 
 
 from pytorchGAT.utils.constants import LayerType
+from torch_geometric.nn import global_mean_pool
 
 
 class GAT(torch.nn.Module):
@@ -64,15 +65,12 @@ class GAT(torch.nn.Module):
 
     # data is just a (in_nodes_features, topology) tuple, I had to do it like this because of the nn.Sequential:
     # https://discuss.pytorch.org/t/forward-takes-2-positional-arguments-but-3-were-given-for-nn-sqeuential-with-linear-layers/65698
-    def forward(self, adj):
-        result = []
-        for A in adj:
-            in_nodes_features = self.emb(torch.sum(A, dim=-1).type(torch.long))
-            edge_index = torch.transpose(torch.nonzero(A), 0, 1)
-            output, _ = self.gat_net((in_nodes_features, edge_index))
-            result.append(output.max(dim=0).values)
-        result = torch.stack(result)
-        return self.last_layer(result)
+    def forward(self, x):
+        x, edge_index, batch = x
+        x = self.emb(x)
+        x, _ = self.gat_net((x, edge_index))
+        x = global_mean_pool(x, batch)
+        return self.last_layer(x)
 
 
 class GATLayer(torch.nn.Module):

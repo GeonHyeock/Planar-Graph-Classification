@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset
+from torch_geometric.utils import dense_to_sparse
 import torch
 import networkx as nx
 import numpy as np
@@ -18,19 +19,32 @@ class GraphDataset(Dataset):
     def __getitem__(self, idx):
         d = dict(self.data.iloc[idx])
         G = nx.read_adjlist(os.path.join(self.data_folder, d["data_path"]))
-        d.update({"graph": G})
-        return d
+        adj = torch.Tensor(nx.to_numpy_array(G))
+        edge_index, _ = dense_to_sparse(adj)
+        degree = adj.sum(dim=-1)
+
+        return {
+            "edge": edge_index,
+            "degree": degree,
+            "label": d["label_name"],
+        }
 
 
 def my_collate_fn(batch):
     b = pd.DataFrame(batch)
-    max_size = b.graph.apply(lambda x: x.number_of_nodes()).max()
-    b.graph = b.graph.apply(lambda x: my_padding(nx.to_numpy_array(x), max_size))
-    b = b.to_dict(orient="list")
+    E, D, B, cumsum = [], [], [], 0
+    for idx in range(len(b)):
+        E.append(b.iloc[idx].edge + cumsum)
+        D.append(b.iloc[idx].degree)
+        B.extend([idx] * len(b.iloc[idx].degree))
+        cumsum += len(b.iloc[idx].degree)
 
-    b["graph"] = torch.stack(b["graph"]).type(torch.float32)
-    b["label"] = torch.tensor(b["label_name"]).type(torch.long)
-    return b
+    return {
+        "edge": torch.cat(E, dim=1),
+        "degree": torch.cat(D).type(torch.long),
+        "batch": torch.tensor(B).type(torch.long),
+        "label": torch.tensor(b.label).type(torch.long),
+    }
 
 
 def my_padding(x, max_size):

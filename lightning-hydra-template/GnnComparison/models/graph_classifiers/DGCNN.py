@@ -60,18 +60,11 @@ class DGCNN(nn.Module):
         )
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, data):
-        if data.shape[0] > 1:
-            x = torch.stack([self.online_forward(d) for d in data]).squeeze()
-        else:
-            x = self.online_forward(data.squeeze())
-        return self.softmax(x)
-
-    def online_forward(self, data, batch=None):
+    def forward(self, x):
         # Implement Equation 4.2 of the paper i.e. concat all layers' graph representations and apply linear model
         # note: this can be decomposed in one smaller linear model per layer
-        x = self.emb(torch.sum(data, dim=-1).type(torch.long))
-        edge_index, _ = dense_to_sparse(data)
+        x, edge_index, batch = x
+        x = self.emb(x)
 
         hidden_repres = []
 
@@ -92,7 +85,7 @@ class DGCNN(nn.Module):
 
         # apply dense layer
         out_dense = self.dense_layer(conv1d_res)
-        return out_dense
+        return self.softmax(out_dense)
 
 
 class DGCNNConv(MessagePassing):

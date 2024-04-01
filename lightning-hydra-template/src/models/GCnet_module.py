@@ -50,7 +50,7 @@ class GCnetLitModule(LightningModule):
         pass
 
     def model_step(self, batch):
-        logit = self.forward(batch["graph"])
+        logit = self.forward((batch["degree"], batch["edge"], batch["batch"]))
         loss = self.criterion(logit, batch["label"])
         preds = torch.argmax(logit, dim=-1)
         return loss, preds, batch["label"]
