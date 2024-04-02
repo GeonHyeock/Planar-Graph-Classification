@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-import numpy as np
-import networkx as nx
+import torch_geometric.nn as gnn
 from GCNET.layer import *
 
 
@@ -10,7 +9,6 @@ class GCnet(nn.Module):
         self,
         node_number=50,
         embedding_size=512,
-        embed_layer=2,
         n_layers=4,
         hidden_size=256,
         n_head=8,
@@ -32,8 +30,37 @@ class GCnet(nn.Module):
         return self.last(x)
 
 
+class GCN(nn.Module):
+    def __init__(
+        self,
+        node_number,
+        embedding_size,
+        in_channels,
+        hidden_channels,
+        num_layers,
+        out_channels,
+        dropout,
+        last_layer_dim,
+        is_prob,
+    ):
+        super(GCN, self).__init__()
+
+        self.emb = nn.Embedding(node_number, embedding_size, padding_idx=0)
+        self.gcn = gnn.GCN(in_channels, hidden_channels, num_layers, out_channels, dropout)
+        self.last_layer = LastLayer(embedding_size, last_layer_dim, dropout, is_prob)
+
+    def forward(self, x):
+        x, edge_index, batch = x
+        x = self.emb(x)
+        x = self.gcn(x, edge_index)
+        x = global_max_pool(x, batch)
+        return self.last_layer(x)
+
+
 if __name__ == "__main__":
     from itertools import permutations
+    import numpy as np
+    import networkx as nx
 
     def cos_sims(output):
         cos_sims = []

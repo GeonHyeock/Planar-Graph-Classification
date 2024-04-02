@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from GCNET.attention import *
-from torch_geometric.nn import global_max_pool
+from torch_geometric.nn import global_max_pool, global_mean_pool
 
 
 class Encoder(nn.Module):

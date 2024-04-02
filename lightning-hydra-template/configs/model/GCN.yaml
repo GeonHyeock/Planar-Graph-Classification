@@ -19,11 +19,13 @@ scheduler_frequency: 1
 
 
 net:
-  _target_: pygcn.pygcn.models.GCN
+  _target_: GCNET.model.GCN
   node_number: 50
   embedding_size: 128
-  nfeat: 128
-  nhid: 64
+  in_channels: 128
+  hidden_channels: 64
+  num_layers: 2
+  out_channels: 128
   dropout: 0.1
   last_layer_dim: [64,2]
   is_prob: True
