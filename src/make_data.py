@@ -32,12 +32,12 @@ def create_folder(args):
             sys.exit()
 
 
-def make_label_graph(args, label, PG, weight_funtion=lambda x: np.log2(x)):
+def make_label_graph(args, label, PG):
 
     sample_node, G = [], nx.Graph([(1, 2)])
     while not (args.min_node <= G.number_of_nodes() and len(sample_node) <= args.max_node and nx.is_connected(G)):
         start_node = int(np.random.choice(PG.nodes, 1))
-        depth = np.random.choice(range(1, 50), 1)
+        depth = np.random.choice(range(1, 250), 1)
         sample_node = set(sum(map(list, nx.dfs_edges(PG, start_node, depth)), []))
         edges = PG.subgraph(sample_node).edges
         sub_edge = np.random.permutation(edges)[: (int(len(edges) * np.random.uniform(0.2, 1)))]
@@ -46,6 +46,7 @@ def make_label_graph(args, label, PG, weight_funtion=lambda x: np.log2(x)):
     assert nx.is_connected(G), "연결 그래프"
 
     if label == "is_PlanarGraph":
+        assert nx.is_planar(G), "평면"
         return G
 
     elif label == "is_not_PlanarGraph":
@@ -62,10 +63,11 @@ def make_label_graph(args, label, PG, weight_funtion=lambda x: np.log2(x)):
         for a, b in sample_edge:
             subdivision_node = list(range(G.number_of_nodes(), G.number_of_nodes() + np.random.randint(0, 5)))
             for sub_node in subdivision_node:
-                sub_connect = np.random.choice(G.nodes, size=np.random.randint(0, 5), replace=False)
+                sub_connect = np.random.choice(G.nodes, size=np.random.randint(0, 10), replace=False)
                 for sub_a, sub_b in product([sub_node], sub_connect):
                     G.add_edge(sub_a, sub_b)
             nx.add_path(G, [a] + subdivision_node + [b])
+        assert not nx.is_planar(G), "평면 아님"
         return G
 
 
@@ -113,9 +115,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default=7, help="data_version")
-    parser.add_argument("--min_node", default=16, help="그래프 노드의 최소 개수")
-    parser.add_argument("--max_node", default=1024, help="그래프 노드의 최대 개수")
+    parser.add_argument("--version", default=8, help="data_version")
+    parser.add_argument("--min_node", default=1024, help="그래프 노드의 최소 개수")
+    parser.add_argument("--max_node", default=4096, help="그래프 노드의 최대 개수")
     parser.add_argument("--N", default=5000, help="Sample_size")
     parser.add_argument("--label_name", nargs="+", default=["is_not_PlanarGraph", "is_PlanarGraph"], help="데이터 라벨")
     parser.add_argument("--PlanarGraph", default="data/planar_embedding1000000.pg", help="평면그래프")
