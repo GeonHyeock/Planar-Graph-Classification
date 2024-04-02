@@ -1,17 +1,20 @@
 import torch
 import torch.nn as nn
+from torch_geometric.nn.aggr import MeanAggregation
 
 
 class ScaleDotProductAttention(nn.Module):
     def __init__(self):
         super().__init__()
+        self.agg = MeanAggregation()
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, q, k, v, adj, latent):
-        k_t = k.transpose(2, 3)
-        score = (q @ k_t) * adj.unsqueeze(1)
-        score = score.masked_fill(adj.unsqueeze(1) == 0, float("-inf"))
-        score = torch.nan_to_num(self.softmax(score))
+    def forward(self, q, k, v, edge_index, latent):
+        A, B = edge_index
+        num_head = q.shape[1]
+        score = q[A] @ k.transpose(-1, -2)[B]
+        score = torch.stack([self.agg(score[:, idx, :], A) for idx in range(num_head)], dim=1)
+        score = self.softmax(score)
         v = score @ v
         return (v, None) if not latent else (v, score)
 
@@ -22,28 +25,28 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.n_head = n_head
         self.attention = ScaleDotProductAttention()
-        self.w_q = nn.Conv1d(embedding_size, embedding_size, 1)
-        self.w_k = nn.Conv1d(embedding_size, embedding_size, 1)
-        self.w_v = nn.Conv1d(embedding_size, embedding_size, 1)
-        self.w_concat = nn.Conv1d(embedding_size, embedding_size, 1)
+        self.w_q = nn.Linear(embedding_size, embedding_size)
+        self.w_k = nn.Linear(embedding_size, embedding_size)
+        self.w_v = nn.Linear(embedding_size, embedding_size)
+        self.w_concat = nn.Linear(embedding_size, embedding_size, 1)
 
-    def forward(self, q, k, v, adj, latent):
+    def forward(self, q, k, v, edge_index, latent):
         q, k, v = self.w_q(q), self.w_k(k), self.w_v(v)
         q, k, v = self.split(q), self.split(k), self.split(v)
-        out, score = self.attention(q, k, v, adj, latent)
+        out, score = self.attention(q, k, v, edge_index, latent)
         out = self.w_concat(self.concat(out))
         return out, score
 
     def split(self, tensor):
-        batch_size, embedding_size, node_size = tensor.size()
+        node_size, embedding_size = tensor.size()
         d_tensor = embedding_size // self.n_head
-        tensor = tensor.view(batch_size, self.n_head, d_tensor, node_size).transpose(2, 3)
+        tensor = tensor.view(node_size, self.n_head, d_tensor)
         return tensor
 
     def concat(self, tensor):
-        batch_size, head, node_size, d_tensor = tensor.size()
-        embedding_size = head * d_tensor
-        tensor = tensor.transpose(2, 3).contiguous().view(batch_size, embedding_size, node_size)
+        node_size, n_head, d_tensor = tensor.size()
+        embedding_size = n_head * d_tensor
+        tensor = tensor.view(node_size, embedding_size)
         return tensor
 
 
@@ -51,10 +54,10 @@ class FeedForward(nn.Module):
     def __init__(self, embedding_size, hidden_size, drop_prob):
         super().__init__()
         self.block = nn.Sequential(
-            nn.Conv1d(embedding_size, hidden_size, 1),
+            nn.Linear(embedding_size, hidden_size),
             nn.GELU(),
             nn.Dropout(drop_prob),
-            nn.Conv1d(hidden_size, embedding_size, 1),
+            nn.Linear(hidden_size, embedding_size),
         )
 
     def forward(self, x):
@@ -72,9 +75,9 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(p=drop_prob)
         self.norm2 = nn.BatchNorm1d(embedding_size)
 
-    def forward(self, x, adj, latent):
+    def forward(self, x, edge_index, batch, latent):
         _x = x
-        x, score = self.attention(x, x, x, adj, latent)
+        x, score = self.attention(x, x, x, edge_index, latent)
         x = self.dropout1(x)
         x = self.norm1(x + _x)
 

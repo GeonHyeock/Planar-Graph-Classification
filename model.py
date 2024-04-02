@@ -60,12 +60,13 @@ class GCnet(nn.Module):
         self.embedding = EmbeddingLayer(node_number, embedding_size)
         self.Tnet = Tnet(embedding_size, Tnet_layers)
         self.last_layer = nn.Linear(embedding_size, classes)
+        self.softmax = nn.Softmax(-1)
 
     def forward(self, x):
         adj, x = self.embedding(x)
         x = self.Tnet(adj, x)
-        x = F.log_softmax(self.last_layer(x))
-        return x
+        x = self.last_layer(x)
+        return self.softmax(x)
 
 
 if __name__ == "__main__":

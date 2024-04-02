@@ -19,13 +19,14 @@ class GCnet(nn.Module):
         is_prob=False,
     ):
         super().__init__()
-        self.embedding = EmbeddingLayer(node_number, embedding_size, embed_layer)
+        self.embedding = nn.Embedding(node_number, embedding_size, padding_idx=0)
         self.encoder = Encoder(embedding_size, hidden_size, n_head, n_layers, drop_prob)
         self.last = LastLayer(embedding_size, last_layer_dim, drop_prob, is_prob)
 
     def forward(self, x, latent=False):
-        emb, adj = self.embedding(x)
-        x, scores = self.encoder(emb, adj, latent)
+        x, edge_index, batch = x
+        x = self.embedding(x)
+        x, scores = self.encoder(x, edge_index, batch, latent)
         if latent:
             return {"latent": x, "scores": scores}
         return self.last(x)
