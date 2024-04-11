@@ -43,8 +43,6 @@ class GCnetLitModule(LightningModule):
         self.valid_loss = MeanMetric()
         self.test_loss = MeanMetric()
 
-        self.test_result = defaultdict(list)
-
     def forward(self, x):
         return self.net(x)
 
@@ -52,7 +50,7 @@ class GCnetLitModule(LightningModule):
         pass
 
     def model_step(self, batch):
-        logit = self.forward(batch["graph"])
+        logit = self.forward((batch["degree"], batch["edge"], batch["batch"]))
         loss = self.criterion(logit, batch["label"])
         preds = torch.argmax(logit, dim=-1)
         return loss, preds, batch["label"]
@@ -83,11 +81,6 @@ class GCnetLitModule(LightningModule):
     def test_step(self, batch, batch_idx):
         loss, preds, targets = self.model_step(batch)
 
-        self.test_result["data_path"] += batch["data_path"]
-        self.test_result["predict"] += [int((torch.exp(preds).round() - 1))]
-        self.test_result["target"] += [int((torch.exp(targets).round() - 1))]
-        self.test_result["loss"] += [loss.tolist()]
-
         # update and log metrics
         self.test_loss(loss)
         self.test_metric(preds, targets)
@@ -95,18 +88,7 @@ class GCnetLitModule(LightningModule):
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self):
-        self.log_dict(self.test_metric)
-        self.test_metric.reset()
-
-        result_df = pd.DataFrame(self.test_result)
-        if isinstance(self.logger, WandbLogger):
-            create_folder(f"../data/result/{self.hparams.DataVersion}")
-            result_df.to_csv(
-                f"../data/result/{self.hparams.DataVersion}/{self.logger._name}.csv",
-                index=False,
-            )
-        else:
-            result_df.to_csv(f"../data/result/my_result.csv", index=False)
+        pass
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":

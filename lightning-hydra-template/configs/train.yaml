@@ -15,10 +15,10 @@ defaults:
 
   # experiment configs allow for version control of specific hyperparameters
   # e.g. best hyperparameters for given model and datamodule
-  - experiment: GCnet
+  - experiment: 
 
   # config for hyperparameter optimization
-  - hparams_search: optuna
+  - hparams_search: 
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
@@ -40,7 +40,7 @@ train: True
 
 # evaluate on test set, using best model weights achieved during training
 # lightning chooses best weights based on the metric specified in checkpoint callback
-test: False
+test: True
 
 # simply provide checkpoint path to resume training
 ckpt_path: null

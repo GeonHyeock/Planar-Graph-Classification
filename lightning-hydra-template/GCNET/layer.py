@@ -1,25 +1,7 @@
 import torch
 import torch.nn as nn
 from GCNET.attention import *
-
-
-class EmbeddingLayer(nn.Module):
-    def __init__(self, node_number, embedding_size, embed_layer):
-        super().__init__()
-        self.embed = nn.Embedding(node_number, embedding_size, padding_idx=0)
-        self.embed_layer = embed_layer
-
-    def forward(self, adj):
-        degree = torch.sum(adj, dim=-1)
-        embed = self.embed(degree.type(torch.long)).permute(0, 2, 1)
-        D = torch.where(degree > 0, 1 / degree, 0).unsqueeze(1)
-        adj = adj * D
-
-        emb = [embed]
-        for _ in range(self.embed_layer):
-            emb.append(emb[-1] @ adj)
-        emb = torch.stack(emb).mean(axis=0)
-        return emb, adj
+from torch_geometric.nn import global_max_pool, global_mean_pool
 
 
 class Encoder(nn.Module):
@@ -27,13 +9,13 @@ class Encoder(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([EncoderLayer(embedding_size, hidden_size, n_head, drop_prob) for _ in range(n_layers)])
 
-    def forward(self, x, adj, latent):
+    def forward(self, x, edge_index, batch, latent):
         scores = []
         for layer in self.layers:
-            x, score = layer(x, adj, latent)
+            x, score = layer(x, edge_index, batch, latent)
             if latent:
                 scores.append(score)
-        x = torch.max(x, dim=-1).values
+        x = global_max_pool(x, batch)
         return (x, None) if not latent else (x, scores)
 
 

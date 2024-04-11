@@ -22,9 +22,8 @@ net:
   _target_: GCNET.model.GCnet
   node_number: 50
   embedding_size: 128
-  embed_layer: 2
-  n_layers: 3
-  hidden_size: 64
+  n_layers: 4
+  hidden_size: 128
   n_head: 8
   drop_prob: 0.1
   last_layer_dim: [64, 2]
