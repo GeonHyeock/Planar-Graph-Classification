@@ -37,7 +37,7 @@ def make_label_graph(args, label, PG):
     sample_node, G = [], nx.Graph([(1, 2)])
     while not (args.min_node <= G.number_of_nodes() and len(sample_node) <= args.max_node and nx.is_connected(G)):
         start_node = int(np.random.choice(PG.nodes, 1))
-        depth = np.random.choice(range(1, 250), 1)
+        depth = np.random.choice(range(1, 500), 1)
         sample_node = set(sum(map(list, nx.dfs_edges(PG, start_node, depth)), []))
         edges = PG.subgraph(sample_node).edges
         sub_edge = np.random.permutation(edges)[: (int(len(edges) * np.random.uniform(0.2, 1)))]
@@ -115,10 +115,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default=8, help="data_version")
-    parser.add_argument("--min_node", default=1024, help="그래프 노드의 최소 개수")
-    parser.add_argument("--max_node", default=4096, help="그래프 노드의 최대 개수")
-    parser.add_argument("--N", default=5000, help="Sample_size")
+    parser.add_argument("--version", default=9, help="data_version")
+    parser.add_argument("--min_node", default=2**10, help="그래프 노드의 최소 개수")
+    parser.add_argument("--max_node", default=2**16, help="그래프 노드의 최대 개수")
+    parser.add_argument("--N", default=50000, help="Sample_size")
     parser.add_argument("--label_name", nargs="+", default=["is_not_PlanarGraph", "is_PlanarGraph"], help="데이터 라벨")
     parser.add_argument("--PlanarGraph", default="data/planar_embedding1000000.pg", help="평면그래프")
     args = parser.parse_args()
