@@ -14,14 +14,17 @@ class GCnetDataModule(LightningDataModule):
         num_workers=0,
         pin_memory=False,
         data_version="",
+        train_version="",
+        valid_version="",
+        test_version="",
     ) -> None:
         super().__init__()
         self.save_hyperparameters(logger=False)
         version_path = os.path.join(data_dir, data_version)
 
-        self.data_train = GraphDataset(version_path, "train")
-        self.data_val = GraphDataset(version_path, "valid")
-        self.data_test = GraphDataset(version_path, "test")
+        self.data_train = GraphDataset(os.path.join(data_dir, train_version), "train")
+        self.data_val = GraphDataset(os.path.join(data_dir, valid_version), "valid")
+        self.data_test = GraphDataset(os.path.join(data_dir, test_version), "test")
         self.batch_size_per_device = batch_size
         self.test_batch_size = test_batch_size
 
@@ -32,9 +35,7 @@ class GCnetDataModule(LightningDataModule):
                 raise RuntimeError(
                     f"Batch size ({self.hparams.batch_size}) is not divisible by the number of devices ({self.trainer.world_size})."
                 )
-            self.batch_size_per_device = (
-                self.hparams.batch_size // self.trainer.world_size
-            )
+            self.batch_size_per_device = self.hparams.batch_size // self.trainer.world_size
 
     def train_dataloader(self) -> DataLoader[Any]:
         """Create and return the train dataloader.
