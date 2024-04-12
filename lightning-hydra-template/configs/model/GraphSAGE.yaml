@@ -23,7 +23,7 @@ net:
   node_number: 50
   embedding_size: 128
   dim_features: 128
-  num_layers: 4
+  num_layers: 2
   dim_target: 2
   aggregation: mean
 

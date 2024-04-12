@@ -22,7 +22,7 @@ net:
   _target_: GnnComparison.models.graph_classifiers.GIN.GIN
   node_number: 50
   embedding_size: 128
-  hidden_units: [128, 64, 128, 64]
+  hidden_units: [128, 128]
   dim_target: 2
   train_eps: False
   aggregation: mean
