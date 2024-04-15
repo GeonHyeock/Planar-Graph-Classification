@@ -4,6 +4,19 @@ from GCNET.attention import *
 from torch_geometric.nn import global_max_pool, global_mean_pool
 
 
+class Emb(nn.Module):
+    def __init__(self, embedding_size):
+        super().__init__()
+        self.x = nn.Parameter(torch.normal(0, 1, size=(embedding_size,)))
+        self.a = nn.Parameter(torch.normal(0, 1, size=(embedding_size,)))
+        self.b = nn.Parameter(torch.normal(0, 1, size=(embedding_size,)))
+
+    def forward(self, degree):
+        x = self.x * degree.unsqueeze(1)
+        x = self.a * torch.cos(x) + self.b
+        return x
+
+
 class Encoder(nn.Module):
     def __init__(self, embedding_size, hidden_size, n_head, n_layers, drop_prob):
         super().__init__()
