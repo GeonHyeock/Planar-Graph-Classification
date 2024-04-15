@@ -91,7 +91,7 @@ def main(cfg: DictConfig) -> None:
     # apply extra utilities
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     extras(cfg)
-
+    cfg.get("model").DataVersion = cfg.get("data").data_version
     evaluate(cfg)
 
 

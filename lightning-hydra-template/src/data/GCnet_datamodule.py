@@ -1,8 +1,7 @@
 from typing import Any, Dict, Optional
 from lightning import LightningDataModule
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from GCNET.dataset import GraphDataset, my_collate_fn
-import os
 
 
 class GCnetDataModule(LightningDataModule):
@@ -20,11 +19,10 @@ class GCnetDataModule(LightningDataModule):
     ) -> None:
         super().__init__()
         self.save_hyperparameters(logger=False)
-        version_path = os.path.join(data_dir, data_version)
 
-        self.data_train = GraphDataset(os.path.join(data_dir, train_version), "train")
-        self.data_val = GraphDataset(os.path.join(data_dir, valid_version), "valid")
-        self.data_test = GraphDataset(os.path.join(data_dir, test_version), "test")
+        self.data_train = GraphDataset(data_dir, train_version, "train")
+        self.data_val = GraphDataset(data_dir, valid_version, "valid")
+        self.data_test = GraphDataset(data_dir, test_version, "test")
         self.batch_size_per_device = batch_size
         self.test_batch_size = test_batch_size
 

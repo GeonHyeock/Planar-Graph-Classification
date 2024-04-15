@@ -7,4 +7,4 @@ pin_memory: False
 data_version: version_009
 train_version: version_007
 valid_version: version_007
-test_version: version_009
+test_version: [version_007, version_008, version_009]

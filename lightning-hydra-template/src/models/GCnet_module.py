@@ -3,8 +3,8 @@ from typing import Any, Dict
 import torch
 import pandas as pd
 import os
+from datetime import datetime
 from collections import defaultdict
-from lightning.pytorch.loggers.wandb import WandbLogger
 from lightning import LightningModule
 from torchmetrics import MeanMetric, MetricCollection
 from torchmetrics.classification import Accuracy, Precision, Recall, F1Score
@@ -42,6 +42,7 @@ class GCnetLitModule(LightningModule):
         self.train_loss = MeanMetric()
         self.valid_loss = MeanMetric()
         self.test_loss = MeanMetric()
+        self.test_result = defaultdict(list)
 
     def forward(self, x):
         return self.net(x)
@@ -87,8 +88,20 @@ class GCnetLitModule(LightningModule):
         self.log_dict(self.test_metric, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
 
+        self.test_result["version"] += batch["version"]
+        self.test_result["predict"] += preds.tolist()
+        self.test_result["target"] += targets.tolist()
+        self.test_result["loss"].append(float(loss))
+
     def on_test_epoch_end(self):
-        pass
+        path = os.path.join(
+            os.getcwd(),
+            "..",
+            "data",
+            "result",
+            self.net.__str__().split("(")[0] + "_" + datetime.today().strftime("%Y_%m_%d_%H_%M") + ".csv",
+        )
+        pd.DataFrame(self.test_result).to_csv(path, index=False)
 
     def setup(self, stage: str) -> None:
         if self.hparams.compile and stage == "fit":
