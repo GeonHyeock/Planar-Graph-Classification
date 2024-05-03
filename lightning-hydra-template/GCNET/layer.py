@@ -28,7 +28,7 @@ class Encoder(nn.Module):
             x, score = layer(x, edge_index, batch, latent)
             if latent:
                 scores.append(score)
-        x = global_max_pool(x, batch)
+        x = global_mean_pool(x, batch)
         return (x, None) if not latent else (x, scores)
 
 
