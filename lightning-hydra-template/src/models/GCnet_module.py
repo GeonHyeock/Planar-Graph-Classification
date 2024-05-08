@@ -99,7 +99,7 @@ class GCnetLitModule(LightningModule):
             "..",
             "data",
             "result",
-            self.net.__str__().split("(")[0] + "_" + datetime.today().strftime("%Y_%m_%d_%H_%M") + ".csv",
+            self.net.__class__.__name__ + "_" + datetime.today().strftime("%Y_%m_%d_%H_%M") + ".csv",
         )
         pd.DataFrame(self.test_result).to_csv(path, index=False)
 

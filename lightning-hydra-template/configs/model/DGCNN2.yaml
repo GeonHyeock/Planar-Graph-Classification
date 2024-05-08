@@ -19,13 +19,13 @@ scheduler_frequency: 1
 
 
 net:
-  _target_: GCNET.Version2.GIN2
+  _target_: GCNET.Version2.DGCNN2
   embedding_size: 128
-  hidden_units: [128, 128]
+  dim_features: 128
+  num_layers: 4
+  dense_dim: 128
   dim_target: 2
-  train_eps: False
-  aggregation: mean
-  dropout: 0.1
+  k: 50
 
 # compile model for faster training with pytorch 2.0
 compile: false
