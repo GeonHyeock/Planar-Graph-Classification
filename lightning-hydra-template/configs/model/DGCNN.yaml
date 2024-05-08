@@ -1,0 +1,34 @@
+_target_: src.models.GCnet_module.GCnetLitModule
+
+optimizer:
+  _target_: torch.optim.AdamW
+  _partial_: true
+  lr: 0.0005
+  weight_decay: 0.05
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+scheduler_monitor: "valid/loss"
+scheduler_interval: "epoch"
+scheduler_frequency: 1
+
+
+net:
+  _target_: GnnComparison.models.graph_classifiers.DGCNN.DGCNN
+  node_number: 50
+  embedding_size: 128
+  dim_features: 128
+  num_layers: 4
+  dense_dim: 128
+  dim_target: 2
+  k: 50
+
+# compile model for faster training with pytorch 2.0
+compile: false
+
+DataVersion: ""
