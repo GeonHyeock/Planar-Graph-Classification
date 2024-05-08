@@ -19,7 +19,7 @@ scheduler_frequency: 1
 
 
 net:
-  _target_: GCNET.GIN2.GIN2
+  _target_: GCNET.Version2.GIN2
   embedding_size: 128
   hidden_units: [128, 128]
   dim_target: 2
