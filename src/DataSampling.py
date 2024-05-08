@@ -115,8 +115,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default=9, help="data_version")
-    parser.add_argument("--min_node", default=2**10, help="그래프 노드의 최소 개수")
+    parser.add_argument("--version", default=1, help="data_version")
+    parser.add_argument("--min_node", default=2**4, help="그래프 노드의 최소 개수")
     parser.add_argument("--max_node", default=2**16, help="그래프 노드의 최대 개수")
     parser.add_argument("--N", default=50000, help="Sample_size")
     parser.add_argument("--label_name", nargs="+", default=["is_not_PlanarGraph", "is_PlanarGraph"], help="데이터 라벨")
