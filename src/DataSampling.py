@@ -120,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_node", default=2**16, help="그래프 노드의 최대 개수")
     parser.add_argument("--N", default=50000, help="Sample_size")
     parser.add_argument("--label_name", nargs="+", default=["is_not_PlanarGraph", "is_PlanarGraph"], help="데이터 라벨")
-    parser.add_argument("--PlanarGraph", default="data/planar_embedding1000000.pg", help="평면그래프")
+    parser.add_argument("--LargePlanarGraph", default="data/planar_embedding1000000.pg", help="평면그래프")
     args = parser.parse_args()
     args.folder_path = "./data/version_" + str(args.version).zfill(3)
     args.label_size = len(args.label_name)
