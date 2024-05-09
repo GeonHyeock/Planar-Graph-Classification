@@ -1,7 +1,7 @@
 # Planar Graph Classification : Graph Neural Network for Graphs
 
 ## Poster
-- KSIAM에서 주관하는 2024 춘계학술대회 포스터 내용입니다.
+- KSIAM에서 주관하는 2024 춘계학술대회에서 발표한 포스터 내용입니다.
 
 <img width="100%" src="./Poster.jpg"/>
 
@@ -23,7 +23,7 @@
    (option) logger=wandb logger.wandb.name={model log name}
 ~~~
 
-## Inference Time Test
+## ⭐️Inference Time Test
 ~~~
 1. cd lightning-hydra-template
 2. python src/test.py model={model name}
