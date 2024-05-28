@@ -21,7 +21,7 @@
 - Mathematical Intelligence Lab에서 학부연구생 활동을 하면서 GNN이 그래프의 본질을 이해할 수 있는지 연구한 내용입니다. \
 단독 1저자로 연구하였으며 2024 [KSIAM](https://ksiam.org/) 춘계학술대회에서 아래의 포스터를 발표해 포스터 우수상을 수상하였습니다.
 
-<img width="100%" src="./Poster.jpg"/>
+<img width="100%" src="./Poster.png"/>
 
 ## Command
 
